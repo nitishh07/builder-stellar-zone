@@ -6,13 +6,48 @@ import { StudentTable } from "@/components/dashboard/StudentTable";
 import { StudentDetailModal } from "@/components/dashboard/StudentDetailModal";
 import { UploadAndReport } from "@/components/report/UploadAndReport";
 import { students } from "@/data/students";
-import type { Student } from "@/data/students";
+import type { Student, FeeStatus } from "@/data/students";
 import { BellRing } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function Dashboard() {
   const [selected, setSelected] = useState<Student | null>(null);
   const [open, setOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<any[] | null>(null);
+
+  function toFeeStatus(remaining: number): FeeStatus {
+    if (remaining <= 0) return "Paid";
+    return "Overdue";
+  }
+  function toRisk(att: string, marks: string, fee: string) {
+    const score = (r: string) => (r === "Red" ? 2 : r === "Orange" ? 1 : 0);
+    const s = score(att) + score(marks) + score(fee);
+    if (s >= 4) return "Critical" as const;
+    if (s >= 2) return "High" as const;
+    if (s === 1) return "Medium" as const;
+    return "Low" as const;
+  }
+
+  const tableData: Student[] = useMemo(() => {
+    if (!csvRows?.length) return students;
+    return csvRows.map((r: any, i: number) => ({
+      id: String(r.student_ID ?? `CSV${i}`),
+      name: String(r.student_ID ?? `Student ${i + 1}`),
+      class: "—",
+      attendance: Math.round(Number(r.Attendence_percentage ?? 0)),
+      avgScore: Math.round(Number(r.marks_percentage ?? 0)),
+      feeStatus: toFeeStatus(Number(r.fee_remaining ?? 0)),
+      risk: toRisk(String(r.Attendance_risk ?? "Green"), String(r.Marks_risk ?? "Green"), String(r.fee_risk ?? "Green")),
+      flags: [
+        Number(r.Attendence_percentage ?? 100) < 60 ? "Low Attendance" : null,
+        Number(r.marks_percentage ?? 100) < 50 ? "Low Score" : null,
+        Number(r.fee_remaining ?? 0) > 0 ? "Fee Overdue" : null,
+      ].filter(Boolean) as string[],
+      contact: { email: "—", phone: "—", guardian: "—", guardianPhone: "—" },
+      attendanceTrend: [],
+      assessments: [],
+    }));
+  }, [csvRows]);
 
   return (
     <AppShell>
@@ -46,11 +81,14 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
-            <UploadAndReport />
+            <UploadAndReport onProcessed={setCsvRows} />
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
+            {csvRows?.length ? (
+              <div className="mb-2 text-xs text-muted-foreground">Showing processed CSV data ({csvRows.length} students)</div>
+            ) : null}
             <StudentTable
-              data={students}
+              data={tableData}
               onRowClick={(s) => {
                 setSelected(s);
                 setOpen(true);
