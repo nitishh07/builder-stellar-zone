@@ -11,11 +11,19 @@ import { toast } from "sonner";
 type CsvRow = Record<string, string | number | null | undefined>;
 
 function canonical(s: string) {
-  return s.toLowerCase().replace(/\s+/g, "").replace(/[_\-]/g, "").replace(/[^a-z0-9]/g, "");
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[_\-]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 type FindKeyOpts = { excludes?: string[] };
-function findKey(obj: Record<string, any>, candidates: string[], opts: FindKeyOpts = {}): string | null {
+function findKey(
+  obj: Record<string, any>,
+  candidates: string[],
+  opts: FindKeyOpts = {},
+): string | null {
   const keys = Object.keys(obj);
   const canonMap = new Map(keys.map((k) => [canonical(k), k] as const));
   const excludes = new Set((opts.excludes || []).map(canonical));
@@ -39,7 +47,10 @@ function findKey(obj: Record<string, any>, candidates: string[], opts: FindKeyOp
 }
 
 function normId(v: any): string {
-  return String(v ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function parseNumber(v: any): number {
@@ -49,10 +60,16 @@ function parseNumber(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function kmeans1D(values: number[], k = 3): { centers: number[]; labels: number[] } {
+function kmeans1D(
+  values: number[],
+  k = 3,
+): { centers: number[]; labels: number[] } {
   if (values.length === 0) return { centers: [], labels: [] };
   const sorted = [...values].sort((a, b) => a - b);
-  const centers = Array.from({ length: k }, (_, i) => sorted[Math.floor(((i + 1) / (k + 1)) * (sorted.length - 1))]);
+  const centers = Array.from(
+    { length: k },
+    (_, i) => sorted[Math.floor(((i + 1) / (k + 1)) * (sorted.length - 1))],
+  );
   const labels = new Array(values.length).fill(0);
   for (let iter = 0; iter < 100; iter++) {
     let changed = false;
@@ -86,7 +103,11 @@ function kmeans1D(values: number[], k = 3): { centers: number[]; labels: number[
   return { centers, labels };
 }
 
-export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) => void }) {
+export function UploadAndReport({
+  onProcessed,
+}: {
+  onProcessed?: (rows: any[]) => void;
+}) {
   const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
   const [marksFile, setMarksFile] = useState<File | null>(null);
   const [feeFile, setFeeFile] = useState<File | null>(null);
@@ -107,7 +128,9 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
   async function process() {
     if (!attendanceFile || !marksFile || !feeFile) {
-      toast.error("Please upload all three CSV files: attendance, marks, and fees.");
+      toast.error(
+        "Please upload all three CSV files: attendance, marks, and fees.",
+      );
       return;
     }
     try {
@@ -123,25 +146,96 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
       }
 
       const attKeys = {
-        id: findKey(att[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
-        attended: findKey(att[0], ["Class_attended", "classes_attended", "attended", "present", "classespresent"])!,
-        total: findKey(att[0], ["Total_classes", "total_classes", "total", "classes", "maxclasses"])!,
-        name: findKey(att[0], ["name", "student_name", "studentname"]) || undefined,
-        klass: findKey(att[0], ["class", "section", "std", "grade"], { excludes: ["totalclasses", "classes", "classattended", "classesattended", "classtotal", "totalclass"] }) || undefined,
+        id: findKey(att[0], [
+          "student_ID",
+          "student id",
+          "studentid",
+          "student_id",
+          "id",
+        ])!,
+        attended: findKey(att[0], [
+          "Class_attended",
+          "classes_attended",
+          "attended",
+          "present",
+          "classespresent",
+        ])!,
+        total: findKey(att[0], [
+          "Total_classes",
+          "total_classes",
+          "total",
+          "classes",
+          "maxclasses",
+        ])!,
+        name:
+          findKey(att[0], ["name", "student_name", "studentname"]) || undefined,
+        klass:
+          findKey(att[0], ["class", "section", "std", "grade"], {
+            excludes: [
+              "totalclasses",
+              "classes",
+              "classattended",
+              "classesattended",
+              "classtotal",
+              "totalclass",
+            ],
+          }) || undefined,
       } as const;
       const marksKeys = {
-        id: findKey(marks[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
-        obtained: findKey(marks[0], ["marks_obtained", "marks", "obtained", "score", "scored"])!,
+        id: findKey(marks[0], [
+          "student_ID",
+          "student id",
+          "studentid",
+          "student_id",
+          "id",
+        ])!,
+        obtained: findKey(marks[0], [
+          "marks_obtained",
+          "marks",
+          "obtained",
+          "score",
+          "scored",
+        ])!,
         total: findKey(marks[0], ["total_marks", "total", "max", "maxmarks"])!,
-        name: findKey(marks[0], ["name", "student_name", "studentname"]) || undefined,
-        klass: findKey(marks[0], ["class", "section", "std", "grade"], { excludes: ["totalclasses", "classes", "classattended", "classesattended", "classtotal", "totalclass"] }) || undefined,
+        name:
+          findKey(marks[0], ["name", "student_name", "studentname"]) ||
+          undefined,
+        klass:
+          findKey(marks[0], ["class", "section", "std", "grade"], {
+            excludes: [
+              "totalclasses",
+              "classes",
+              "classattended",
+              "classesattended",
+              "classtotal",
+              "totalclass",
+            ],
+          }) || undefined,
       } as const;
       const feeKeys = {
-        id: findKey(fees[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
+        id: findKey(fees[0], [
+          "student_ID",
+          "student id",
+          "studentid",
+          "student_id",
+          "id",
+        ])!,
         total: findKey(fees[0], ["total_fee", "feetotal", "total"])!,
         paid: findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"])!,
-        name: findKey(fees[0], ["name", "student_name", "studentname"]) || undefined,
-        klass: findKey(fees[0], ["class", "section", "std", "grade"], { excludes: ["totalclasses", "classes", "classattended", "classesattended", "classtotal", "totalclass"] }) || undefined,
+        name:
+          findKey(fees[0], ["name", "student_name", "studentname"]) ||
+          undefined,
+        klass:
+          findKey(fees[0], ["class", "section", "std", "grade"], {
+            excludes: [
+              "totalclasses",
+              "classes",
+              "classattended",
+              "classesattended",
+              "classtotal",
+              "totalclass",
+            ],
+          }) || undefined,
       } as const;
 
       if (!attKeys.id || !marksKeys.id || !feeKeys.id) {
@@ -149,7 +243,10 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         return;
       }
 
-      const attendenceMap = new Map<string, { Attendence_percentage: number }>();
+      const attendenceMap = new Map<
+        string,
+        { Attendence_percentage: number }
+      >();
       const nameMap = new Map<string, string>();
       const classMap = new Map<string, string>();
       for (const r of att) {
@@ -159,8 +256,10 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const total = parseNumber(r[attKeys.total]);
         const pct = (attended / (total || 1)) * 100;
         attendenceMap.set(id, { Attendence_percentage: pct });
-        if (attKeys.name && r[attKeys.name] != null) nameMap.set(id, String(r[attKeys.name]));
-        if (attKeys.klass && r[attKeys.klass] != null) classMap.set(id, String(r[attKeys.klass]));
+        if (attKeys.name && r[attKeys.name] != null)
+          nameMap.set(id, String(r[attKeys.name]));
+        if (attKeys.klass && r[attKeys.klass] != null)
+          classMap.set(id, String(r[attKeys.klass]));
       }
 
       const marksMap = new Map<string, { marks_percentage: number }>();
@@ -171,8 +270,10 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const total = parseNumber(r[marksKeys.total]);
         const pct = (obtained / (total || 1)) * 100;
         marksMap.set(id, { marks_percentage: pct });
-        if (marksKeys.name && r[marksKeys.name] != null && !nameMap.has(id)) nameMap.set(id, String(r[marksKeys.name]));
-        if (marksKeys.klass && r[marksKeys.klass] != null && !classMap.has(id)) classMap.set(id, String(r[marksKeys.klass]));
+        if (marksKeys.name && r[marksKeys.name] != null && !nameMap.has(id))
+          nameMap.set(id, String(r[marksKeys.name]));
+        if (marksKeys.klass && r[marksKeys.klass] != null && !classMap.has(id))
+          classMap.set(id, String(r[marksKeys.klass]));
       }
 
       const feeMap = new Map<string, { fee_remaining: number }>();
@@ -183,8 +284,10 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const paid = parseNumber(r[feeKeys.paid]);
         const remaining = total - paid;
         feeMap.set(id, { fee_remaining: remaining });
-        if (feeKeys.name && r[feeKeys.name] != null && !nameMap.has(id)) nameMap.set(id, String(r[feeKeys.name]));
-        if (feeKeys.klass && r[feeKeys.klass] != null && !classMap.has(id)) classMap.set(id, String(r[feeKeys.klass]));
+        if (feeKeys.name && r[feeKeys.name] != null && !nameMap.has(id))
+          nameMap.set(id, String(r[feeKeys.name]));
+        if (feeKeys.klass && r[feeKeys.klass] != null && !classMap.has(id))
+          classMap.set(id, String(r[feeKeys.klass]));
       }
 
       const allIds = new Set<string>([
@@ -211,11 +314,17 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
       const feesVals = merged.map((r) => r.fee_remaining);
       const { labels } = kmeans1D(feesVals, 3);
-      const clusterMeans = [0, 1, 2].map((c) => {
-        const vals = merged.filter((_, i) => labels[i] === c).map((r) => r.fee_remaining);
-        const mean = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-        return { c, mean };
-      }).sort((a, b) => a.mean - b.mean);
+      const clusterMeans = [0, 1, 2]
+        .map((c) => {
+          const vals = merged
+            .filter((_, i) => labels[i] === c)
+            .map((r) => r.fee_remaining);
+          const mean = vals.length
+            ? vals.reduce((s, v) => s + v, 0) / vals.length
+            : 0;
+          return { c, mean };
+        })
+        .sort((a, b) => a.mean - b.mean);
       const order = clusterMeans.map((x) => x.c);
       const clusterMapping: Record<number, "Green" | "Orange" | "Red"> = {
         [order[0]]: "Green",
@@ -244,10 +353,14 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
       setRows(merged);
       onProcessed?.(merged);
-      toast.success(`Processed ${merged.length} students. You can download the Excel file now.`);
+      toast.success(
+        `Processed ${merged.length} students. You can download the Excel file now.`,
+      );
     } catch (e: any) {
       console.error(e);
-      toast.error("Failed to process files. Ensure CSV headers match expected format.");
+      toast.error(
+        "Failed to process files. Ensure CSV headers match expected format.",
+      );
     }
   }
 
@@ -293,13 +406,19 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const cell = ws.getCell(row, col);
         const c = colorMap[String(cell.value ?? "")];
         if (c) {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: c } } as any;
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: c },
+          } as any;
         }
       }
     }
 
     const buf = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -311,29 +430,59 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
   return (
     <Card className="p-4 shadow-sm">
-      <div className="mb-2 text-sm font-semibold">Upload and Generate Report</div>
-      <p className="mb-3 text-sm text-muted-foreground">Upload attendance.csv, marks.csv, and fees.csv to generate a combined, color-coded Excel report.</p>
+      <div className="mb-2 text-sm font-semibold">
+        Upload and Generate Report
+      </div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Upload attendance.csv, marks.csv, and fees.csv to generate a combined,
+        color-coded Excel report.
+      </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="attendance">Attendance CSV</Label>
-          <Input id="attendance" type="file" accept=".csv,text/csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
+          <Input
+            id="attendance"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="marks">Marks CSV</Label>
-          <Input id="marks" type="file" accept=".csv,text/csv" onChange={(e) => setMarksFile(e.target.files?.[0] || null)} />
+          <Input
+            id="marks"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setMarksFile(e.target.files?.[0] || null)}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="fees">Fees CSV</Label>
-          <Input id="fees" type="file" accept=".csv,text/csv" onChange={(e) => setFeeFile(e.target.files?.[0] || null)} />
+          <Input
+            id="fees"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setFeeFile(e.target.files?.[0] || null)}
+          />
         </div>
       </div>
       <Separator className="my-4" />
       <div className="flex flex-wrap gap-2">
         <Button onClick={process}>Process Files</Button>
-        <Button variant="outline" onClick={downloadExcel} disabled={!rows?.length}>Download Excel</Button>
+        <Button
+          variant="outline"
+          onClick={downloadExcel}
+          disabled={!rows?.length}
+        >
+          Download Excel
+        </Button>
       </div>
       {rows?.length ? (
-        <div className="mt-3 text-xs text-muted-foreground">Processed {rows.length} rows. Columns: student_ID, name, class, Attendence_percentage, marks_percentage, fee_remaining, fee_cluster, fee_risk, Attendance_risk, Marks_risk</div>
+        <div className="mt-3 text-xs text-muted-foreground">
+          Processed {rows.length} rows. Columns: student_ID, name, class,
+          Attendence_percentage, marks_percentage, fee_remaining, fee_cluster,
+          fee_risk, Attendance_risk, Marks_risk
+        </div>
       ) : null}
     </Card>
   );
