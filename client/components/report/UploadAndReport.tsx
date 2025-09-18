@@ -108,17 +108,23 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         id: findKey(att[0], ["student_ID", "student_id", "id", "Student_ID"])!,
         attended: findKey(att[0], ["Class_attended", "classes_attended", "attended"])!,
         total: findKey(att[0], ["Total_classes", "total_classes", "total"])!,
-      };
+        name: findKey(att[0], ["name", "student_name", "Name"]) || undefined,
+        klass: findKey(att[0], ["class", "Class", "section", "Section"]) || undefined,
+      } as const;
       const marksKeys = {
         id: findKey(marks[0], ["student_ID", "student_id", "id", "Student_ID"])!,
         obtained: findKey(marks[0], ["marks_obtained", "obtained", "score"])!,
         total: findKey(marks[0], ["total_marks", "max", "total"])!,
-      };
+        name: findKey(marks[0], ["name", "student_name", "Name"]) || undefined,
+        klass: findKey(marks[0], ["class", "Class", "section", "Section"]) || undefined,
+      } as const;
       const feeKeys = {
         id: findKey(fees[0], ["student_ID", "student_id", "id", "Student_ID"])!,
         total: findKey(fees[0], ["total_fee", "fee_total", "total"])!,
         paid: findKey(fees[0], ["fee_paid", "paid", "amount_paid"])!,
-      };
+        name: findKey(fees[0], ["name", "student_name", "Name"]) || undefined,
+        klass: findKey(fees[0], ["class", "Class", "section", "Section"]) || undefined,
+      } as const;
 
       if (!attKeys.id || !marksKeys.id || !feeKeys.id) {
         toast.error("Could not detect student ID column in one of the files.");
@@ -126,12 +132,16 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
       }
 
       const attendenceMap = new Map<string, { Attendence_percentage: number }>();
+      const nameMap = new Map<string, string>();
+      const classMap = new Map<string, string>();
       for (const r of att) {
         const id = String(r[attKeys.id]);
         const attended = parseNumber(r[attKeys.attended]);
         const total = parseNumber(r[attKeys.total]);
         const pct = (attended / (total || 1)) * 100;
         attendenceMap.set(id, { Attendence_percentage: pct });
+        if (attKeys.name && r[attKeys.name] != null) nameMap.set(id, String(r[attKeys.name]));
+        if (attKeys.klass && r[attKeys.klass] != null) classMap.set(id, String(r[attKeys.klass]));
       }
 
       const marksMap = new Map<string, { marks_percentage: number }>();
@@ -141,6 +151,8 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const total = parseNumber(r[marksKeys.total]);
         const pct = (obtained / (total || 1)) * 100;
         marksMap.set(id, { marks_percentage: pct });
+        if (marksKeys.name && r[marksKeys.name] != null && !nameMap.has(id)) nameMap.set(id, String(r[marksKeys.name]));
+        if (marksKeys.klass && r[marksKeys.klass] != null && !classMap.has(id)) classMap.set(id, String(r[marksKeys.klass]));
       }
 
       const feeMap = new Map<string, { fee_remaining: number }>();
@@ -150,6 +162,8 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         const paid = parseNumber(r[feeKeys.paid]);
         const remaining = total - paid;
         feeMap.set(id, { fee_remaining: remaining });
+        if (feeKeys.name && r[feeKeys.name] != null && !nameMap.has(id)) nameMap.set(id, String(r[feeKeys.name]));
+        if (feeKeys.klass && r[feeKeys.klass] != null && !classMap.has(id)) classMap.set(id, String(r[feeKeys.klass]));
       }
 
       const allIds = new Set<string>([
@@ -166,6 +180,8 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         if (!a && !m && !f) continue;
         merged.push({
           student_ID: id,
+          name: nameMap.get(id) ?? null,
+          class: classMap.get(id) ?? null,
           Attendence_percentage: a?.Attendence_percentage ?? 0,
           marks_percentage: m?.marks_percentage ?? 0,
           fee_remaining: f?.fee_remaining ?? 0,
@@ -224,6 +240,8 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
     const headers = [
       "student_ID",
+      "name",
+      "class",
       "Attendence_percentage",
       "marks_percentage",
       "fee_remaining",
@@ -294,7 +312,7 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
         <Button variant="outline" onClick={downloadExcel} disabled={!rows?.length}>Download Excel</Button>
       </div>
       {rows?.length ? (
-        <div className="mt-3 text-xs text-muted-foreground">Processed {rows.length} rows. Columns: student_ID, Attendence_percentage, marks_percentage, fee_remaining, fee_cluster, fee_risk, Attendance_risk, Marks_risk</div>
+        <div className="mt-3 text-xs text-muted-foreground">Processed {rows.length} rows. Columns: student_ID, name, class, Attendence_percentage, marks_percentage, fee_remaining, fee_cluster, fee_risk, Attendance_risk, Marks_risk</div>
       ) : null}
     </Card>
   );
