@@ -10,18 +10,27 @@ import { toast } from "sonner";
 
 type CsvRow = Record<string, string | number | null | undefined>;
 
+function canonical(s: string) {
+  return s.toLowerCase().replace(/\s+/g, "").replace(/[_\-]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
 function findKey(obj: Record<string, any>, candidates: string[]): string | null {
   const keys = Object.keys(obj);
+  const canonMap = new Map(keys.map((k) => [canonical(k), k] as const));
   for (const c of candidates) {
-    const k = keys.find((x) => x.toLowerCase() === c.toLowerCase());
-    if (k) return k;
+    const exact = canonMap.get(canonical(c));
+    if (exact) return exact;
   }
-  // try contains
   for (const c of candidates) {
-    const k = keys.find((x) => x.toLowerCase().includes(c.toLowerCase()));
-    if (k) return k;
+    const ccanon = canonical(c);
+    const found = keys.find((k) => canonical(k).includes(ccanon));
+    if (found) return found;
   }
   return null;
+}
+
+function normId(v: any): string {
+  return String(v ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function parseNumber(v: any): number {
@@ -105,25 +114,25 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
       }
 
       const attKeys = {
-        id: findKey(att[0], ["student_ID", "student_id", "id", "Student_ID"])!,
-        attended: findKey(att[0], ["Class_attended", "classes_attended", "attended"])!,
-        total: findKey(att[0], ["Total_classes", "total_classes", "total"])!,
-        name: findKey(att[0], ["name", "student_name", "Name"]) || undefined,
-        klass: findKey(att[0], ["class", "Class", "section", "Section"]) || undefined,
+        id: findKey(att[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
+        attended: findKey(att[0], ["Class_attended", "classes_attended", "attended", "present", "classespresent"])!,
+        total: findKey(att[0], ["Total_classes", "total_classes", "total", "classes", "maxclasses"])!,
+        name: findKey(att[0], ["name", "student_name", "studentname"]) || undefined,
+        klass: findKey(att[0], ["class", "section", "std", "grade"]) || undefined,
       } as const;
       const marksKeys = {
-        id: findKey(marks[0], ["student_ID", "student_id", "id", "Student_ID"])!,
-        obtained: findKey(marks[0], ["marks_obtained", "obtained", "score"])!,
-        total: findKey(marks[0], ["total_marks", "max", "total"])!,
-        name: findKey(marks[0], ["name", "student_name", "Name"]) || undefined,
-        klass: findKey(marks[0], ["class", "Class", "section", "Section"]) || undefined,
+        id: findKey(marks[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
+        obtained: findKey(marks[0], ["marks_obtained", "marks", "obtained", "score", "scored"])!,
+        total: findKey(marks[0], ["total_marks", "total", "max", "maxmarks"])!,
+        name: findKey(marks[0], ["name", "student_name", "studentname"]) || undefined,
+        klass: findKey(marks[0], ["class", "section", "std", "grade"]) || undefined,
       } as const;
       const feeKeys = {
-        id: findKey(fees[0], ["student_ID", "student_id", "id", "Student_ID"])!,
-        total: findKey(fees[0], ["total_fee", "fee_total", "total"])!,
-        paid: findKey(fees[0], ["fee_paid", "paid", "amount_paid"])!,
-        name: findKey(fees[0], ["name", "student_name", "Name"]) || undefined,
-        klass: findKey(fees[0], ["class", "Class", "section", "Section"]) || undefined,
+        id: findKey(fees[0], ["student_ID", "student id", "studentid", "student_id", "id"])!,
+        total: findKey(fees[0], ["total_fee", "feetotal", "total"])!,
+        paid: findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"])!,
+        name: findKey(fees[0], ["name", "student_name", "studentname"]) || undefined,
+        klass: findKey(fees[0], ["class", "section", "std", "grade"]) || undefined,
       } as const;
 
       if (!attKeys.id || !marksKeys.id || !feeKeys.id) {
@@ -135,7 +144,7 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
       const nameMap = new Map<string, string>();
       const classMap = new Map<string, string>();
       for (const r of att) {
-        const id = String(r[attKeys.id]);
+        const id = normId(r[attKeys.id]);
         const attended = parseNumber(r[attKeys.attended]);
         const total = parseNumber(r[attKeys.total]);
         const pct = (attended / (total || 1)) * 100;
@@ -146,7 +155,7 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
       const marksMap = new Map<string, { marks_percentage: number }>();
       for (const r of marks) {
-        const id = String(r[marksKeys.id]);
+        const id = normId(r[marksKeys.id]);
         const obtained = parseNumber(r[marksKeys.obtained]);
         const total = parseNumber(r[marksKeys.total]);
         const pct = (obtained / (total || 1)) * 100;
@@ -157,7 +166,7 @@ export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) =
 
       const feeMap = new Map<string, { fee_remaining: number }>();
       for (const r of fees) {
-        const id = String(r[feeKeys.id]);
+        const id = normId(r[feeKeys.id]);
         const total = parseNumber(r[feeKeys.total]);
         const paid = parseNumber(r[feeKeys.paid]);
         const remaining = total - paid;
