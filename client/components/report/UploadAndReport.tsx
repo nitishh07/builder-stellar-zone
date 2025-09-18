@@ -75,15 +75,16 @@ export function UploadAndReport() {
   const [rows, setRows] = useState<any[] | null>(null);
 
   async function readCsv(file: File): Promise<CsvRow[]> {
-    return new Promise((resolve, reject) => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        dynamicTyping: true,
-        complete: (res) => resolve(res.data as CsvRow[]),
-        error: (err) => reject(err),
-      });
+    const text = await file.text();
+    const res = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: true,
     });
+    if (res.errors && res.errors.length) {
+      console.warn("CSV parse warnings:", res.errors);
+    }
+    return res.data as CsvRow[];
   }
 
   async function process() {
@@ -275,15 +276,15 @@ export function UploadAndReport() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="attendance">Attendance CSV</Label>
-          <Input id="attendance" type="file" accept=".csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
+          <Input id="attendance" type="file" accept=".csv,text/csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="marks">Marks CSV</Label>
-          <Input id="marks" type="file" accept=".csv" onChange={(e) => setMarksFile(e.target.files?.[0] || null)} />
+          <Input id="marks" type="file" accept=".csv,text/csv" onChange={(e) => setMarksFile(e.target.files?.[0] || null)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="fees">Fees CSV</Label>
-          <Input id="fees" type="file" accept=".csv" onChange={(e) => setFeeFile(e.target.files?.[0] || null)} />
+          <Input id="fees" type="file" accept=".csv,text/csv" onChange={(e) => setFeeFile(e.target.files?.[0] || null)} />
         </div>
       </div>
       <Separator className="my-4" />
