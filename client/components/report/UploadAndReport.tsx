@@ -68,7 +68,7 @@ function kmeans1D(values: number[], k = 3): { centers: number[]; labels: number[
   return { centers, labels };
 }
 
-export function UploadAndReport() {
+export function UploadAndReport({ onProcessed }: { onProcessed?: (rows: any[]) => void }) {
   const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
   const [marksFile, setMarksFile] = useState<File | null>(null);
   const [feeFile, setFeeFile] = useState<File | null>(null);
@@ -206,6 +206,7 @@ export function UploadAndReport() {
       }
 
       setRows(merged);
+      onProcessed?.(merged);
       toast.success(`Processed ${merged.length} students. You can download the Excel file now.`);
     } catch (e: any) {
       console.error(e);
