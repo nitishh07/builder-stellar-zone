@@ -45,6 +45,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <UploadAndReport />
+          </div>
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
             <StudentTable
               data={students}
               onRowClick={(s) => {
