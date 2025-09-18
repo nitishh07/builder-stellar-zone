@@ -1,0 +1,299 @@
+import { useState } from "react";
+import Papa from "papaparse";
+import ExcelJS from "exceljs";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+
+type CsvRow = Record<string, string | number | null | undefined>;
+
+function findKey(obj: Record<string, any>, candidates: string[]): string | null {
+  const keys = Object.keys(obj);
+  for (const c of candidates) {
+    const k = keys.find((x) => x.toLowerCase() === c.toLowerCase());
+    if (k) return k;
+  }
+  // try contains
+  for (const c of candidates) {
+    const k = keys.find((x) => x.toLowerCase().includes(c.toLowerCase()));
+    if (k) return k;
+  }
+  return null;
+}
+
+function parseNumber(v: any): number {
+  if (v == null) return 0;
+  const s = String(v).replace(/[^0-9.\-]/g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function kmeans1D(values: number[], k = 3): { centers: number[]; labels: number[] } {
+  if (values.length === 0) return { centers: [], labels: [] };
+  const sorted = [...values].sort((a, b) => a - b);
+  const centers = Array.from({ length: k }, (_, i) => sorted[Math.floor(((i + 1) / (k + 1)) * (sorted.length - 1))]);
+  const labels = new Array(values.length).fill(0);
+  for (let iter = 0; iter < 100; iter++) {
+    let changed = false;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      let best = 0;
+      let bestDist = Math.abs(v - centers[0]);
+      for (let c = 1; c < k; c++) {
+        const d = Math.abs(v - centers[c]);
+        if (d < bestDist) {
+          bestDist = d;
+          best = c;
+        }
+      }
+      if (labels[i] !== best) {
+        labels[i] = best;
+        changed = true;
+      }
+    }
+    const sums = new Array(k).fill(0);
+    const counts = new Array(k).fill(0);
+    for (let i = 0; i < values.length; i++) {
+      sums[labels[i]] += values[i];
+      counts[labels[i]]++;
+    }
+    for (let c = 0; c < k; c++) {
+      if (counts[c] > 0) centers[c] = sums[c] / counts[c];
+    }
+    if (!changed) break;
+  }
+  return { centers, labels };
+}
+
+export function UploadAndReport() {
+  const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
+  const [marksFile, setMarksFile] = useState<File | null>(null);
+  const [feeFile, setFeeFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<any[] | null>(null);
+
+  async function readCsv(file: File): Promise<CsvRow[]> {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+        complete: (res) => resolve(res.data as CsvRow[]),
+        error: (err) => reject(err),
+      });
+    });
+  }
+
+  async function process() {
+    if (!attendanceFile || !marksFile || !feeFile) {
+      toast.error("Please upload all three CSV files: attendance, marks, and fees.");
+      return;
+    }
+    try {
+      const [att, marks, fees] = await Promise.all([
+        readCsv(attendanceFile),
+        readCsv(marksFile),
+        readCsv(feeFile),
+      ]);
+
+      if (!att.length || !marks.length || !fees.length) {
+        toast.error("One or more CSV files are empty.");
+        return;
+      }
+
+      const attKeys = {
+        id: findKey(att[0], ["student_ID", "student_id", "id", "Student_ID"])!,
+        attended: findKey(att[0], ["Class_attended", "classes_attended", "attended"])!,
+        total: findKey(att[0], ["Total_classes", "total_classes", "total"])!,
+      };
+      const marksKeys = {
+        id: findKey(marks[0], ["student_ID", "student_id", "id", "Student_ID"])!,
+        obtained: findKey(marks[0], ["marks_obtained", "obtained", "score"])!,
+        total: findKey(marks[0], ["total_marks", "max", "total"])!,
+      };
+      const feeKeys = {
+        id: findKey(fees[0], ["student_ID", "student_id", "id", "Student_ID"])!,
+        total: findKey(fees[0], ["total_fee", "fee_total", "total"])!,
+        paid: findKey(fees[0], ["fee_paid", "paid", "amount_paid"])!,
+      };
+
+      if (!attKeys.id || !marksKeys.id || !feeKeys.id) {
+        toast.error("Could not detect student ID column in one of the files.");
+        return;
+      }
+
+      const attendenceMap = new Map<string, { Attendence_percentage: number }>();
+      for (const r of att) {
+        const id = String(r[attKeys.id]);
+        const attended = parseNumber(r[attKeys.attended]);
+        const total = parseNumber(r[attKeys.total]);
+        const pct = (attended / (total || 1)) * 100;
+        attendenceMap.set(id, { Attendence_percentage: pct });
+      }
+
+      const marksMap = new Map<string, { marks_percentage: number }>();
+      for (const r of marks) {
+        const id = String(r[marksKeys.id]);
+        const obtained = parseNumber(r[marksKeys.obtained]);
+        const total = parseNumber(r[marksKeys.total]);
+        const pct = (obtained / (total || 1)) * 100;
+        marksMap.set(id, { marks_percentage: pct });
+      }
+
+      const feeMap = new Map<string, { fee_remaining: number }>();
+      for (const r of fees) {
+        const id = String(r[feeKeys.id]);
+        const total = parseNumber(r[feeKeys.total]);
+        const paid = parseNumber(r[feeKeys.paid]);
+        const remaining = total - paid;
+        feeMap.set(id, { fee_remaining: remaining });
+      }
+
+      const allIds = new Set<string>([
+        ...Array.from(attendenceMap.keys()),
+        ...Array.from(marksMap.keys()),
+        ...Array.from(feeMap.keys()),
+      ]);
+
+      const merged: any[] = [];
+      for (const id of allIds) {
+        const a = attendenceMap.get(id);
+        const m = marksMap.get(id);
+        const f = feeMap.get(id);
+        if (!a && !m && !f) continue;
+        merged.push({
+          student_ID: id,
+          Attendence_percentage: a?.Attendence_percentage ?? 0,
+          marks_percentage: m?.marks_percentage ?? 0,
+          fee_remaining: f?.fee_remaining ?? 0,
+        });
+      }
+
+      const feesVals = merged.map((r) => r.fee_remaining);
+      const { labels } = kmeans1D(feesVals, 3);
+      const clusterMeans = [0, 1, 2].map((c) => {
+        const vals = merged.filter((_, i) => labels[i] === c).map((r) => r.fee_remaining);
+        const mean = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+        return { c, mean };
+      }).sort((a, b) => a.mean - b.mean);
+      const order = clusterMeans.map((x) => x.c);
+      const clusterMapping: Record<number, "Green" | "Orange" | "Red"> = {
+        [order[0]]: "Green",
+        [order[1]]: "Orange",
+        [order[2]]: "Red",
+      } as const;
+
+      function attendanceRisk(x: number) {
+        if (x < 50) return "Red";
+        if (x < 75 && x > 50) return "Orange";
+        return "Green";
+      }
+      function marksRisk(x: number) {
+        if (x < 40) return "Red";
+        if (x < 75 && x > 40) return "Orange";
+        return "Green";
+      }
+
+      for (let i = 0; i < merged.length; i++) {
+        const r = merged[i];
+        r.fee_cluster = labels[i] ?? 0;
+        r.fee_risk = clusterMapping[r.fee_cluster];
+        r.Attendance_risk = attendanceRisk(r.Attendence_percentage);
+        r.Marks_risk = marksRisk(r.marks_percentage);
+      }
+
+      setRows(merged);
+      toast.success(`Processed ${merged.length} students. You can download the Excel file now.`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Failed to process files. Ensure CSV headers match expected format.");
+    }
+  }
+
+  async function downloadExcel() {
+    if (!rows || !rows.length) {
+      toast("Please process files first.");
+      return;
+    }
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("report");
+
+    const headers = [
+      "student_ID",
+      "Attendence_percentage",
+      "marks_percentage",
+      "fee_remaining",
+      "fee_cluster",
+      "fee_risk",
+      "Attendance_risk",
+      "Marks_risk",
+    ];
+    ws.addRow(headers);
+    for (const r of rows) {
+      ws.addRow(headers.map((h) => (r as any)[h]));
+    }
+
+    const colorMap: Record<string, string> = {
+      Red: "FF9999",
+      Orange: "FFD580",
+      Green: "99FF99",
+    };
+
+    const headerRow = ws.getRow(1);
+    const feeRiskCol = headerRow.values?.indexOf("fee_risk") || 0;
+    const attRiskCol = headerRow.values?.indexOf("Attendance_risk") || 0;
+    const marksRiskCol = headerRow.values?.indexOf("Marks_risk") || 0;
+
+    for (let row = 2; row <= ws.rowCount; row++) {
+      for (const col of [feeRiskCol, attRiskCol, marksRiskCol]) {
+        if (!col) continue;
+        const cell = ws.getCell(row, col);
+        const c = colorMap[String(cell.value ?? "")];
+        if (c) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: c } } as any;
+        }
+      }
+    }
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "student_risk.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Colored Excel saved as student_risk.xlsx");
+  }
+
+  return (
+    <Card className="p-4 shadow-sm">
+      <div className="mb-2 text-sm font-semibold">Upload and Generate Report</div>
+      <p className="mb-3 text-sm text-muted-foreground">Upload attendance.csv, marks.csv, and fees.csv to generate a combined, color-coded Excel report.</p>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="space-y-2">
+          <Label htmlFor="attendance">Attendance CSV</Label>
+          <Input id="attendance" type="file" accept=".csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="marks">Marks CSV</Label>
+          <Input id="marks" type="file" accept=".csv" onChange={(e) => setMarksFile(e.target.files?.[0] || null)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="fees">Fees CSV</Label>
+          <Input id="fees" type="file" accept=".csv" onChange={(e) => setFeeFile(e.target.files?.[0] || null)} />
+        </div>
+      </div>
+      <Separator className="my-4" />
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={process}>Process Files</Button>
+        <Button variant="outline" onClick={downloadExcel} disabled={!rows?.length}>Download Excel</Button>
+      </div>
+      {rows?.length ? (
+        <div className="mt-3 text-xs text-muted-foreground">Processed {rows.length} rows. Columns: student_ID, Attendence_percentage, marks_percentage, fee_remaining, fee_cluster, fee_risk, Attendance_risk, Marks_risk</div>
+      ) : null}
+    </Card>
+  );
+}
