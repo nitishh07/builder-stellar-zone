@@ -32,8 +32,8 @@ export default function Dashboard() {
     if (!csvRows?.length) return students;
     return csvRows.map((r: any, i: number) => ({
       id: String(r.student_ID ?? `CSV${i}`),
-      name: String(r.student_ID ?? `Student ${i + 1}`),
-      class: "—",
+      name: String(r.name ?? r.student_ID ?? `Student ${i + 1}`),
+      class: String(r.class ?? "—"),
       attendance: Math.round(Number(r.Attendence_percentage ?? 0)),
       avgScore: Math.round(Number(r.marks_percentage ?? 0)),
       feeStatus: toFeeStatus(Number(r.fee_remaining ?? 0)),
