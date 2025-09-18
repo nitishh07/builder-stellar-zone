@@ -1,4 +1,3 @@
-import { Link, useLocation } from "react-router-dom";
 import { Bell, LogOut, Settings, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,11 +7,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) => {
-  const location = useLocation();
-  const active = location.pathname === to;
+  const active = typeof window !== "undefined" && window.location?.pathname === to;
   return (
-    <Link
-      to={to}
+    <a
+      href={to}
       className={cn(
         "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
         active && "bg-accent text-accent-foreground",
@@ -20,7 +18,7 @@ const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) =>
       aria-current={active ? "page" : undefined}
     >
       {children}
-    </Link>
+    </a>
   );
 };
 
@@ -29,10 +27,10 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2" aria-label="Student Risk Monitoring & Counselling System home">
+          <a href="/" className="flex items-center gap-2" aria-label="Student Risk Monitoring & Counselling System home">
             <div className="size-8 rounded-md bg-gradient-to-br from-brand-500 to-brand-600 shadow-sm" />
             <span className="hidden text-sm font-extrabold tracking-tight text-foreground sm:inline">Student Risk Monitoring</span>
-          </Link>
+          </a>
           <Separator orientation="vertical" className="mx-2 h-6" />
           <nav className="hidden items-center gap-1 md:flex">
             <NavLink to="/dashboard">Dashboard</NavLink>
@@ -66,12 +64,12 @@ export function Header() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/config" className="flex items-center gap-2">
+                <a href="/config" className="flex items-center gap-2">
                   <Settings className="size-4" /> Admin Settings
-                </Link>
+                </a>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => toast("Logged out (prototype)")}> 
+              <DropdownMenuItem onClick={() => toast("Logged out (prototype)")}>
                 <LogOut className="mr-2 size-4" />
                 <span>Logout</span>
               </DropdownMenuItem>
