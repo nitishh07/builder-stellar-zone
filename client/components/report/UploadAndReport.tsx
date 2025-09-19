@@ -159,14 +159,20 @@ export function UploadAndReport({
           "attended",
           "present",
           "classespresent",
-        ])!,
+        ]) || null,
         total: findKey(att[0], [
           "Total_classes",
           "total_classes",
           "total",
           "classes",
           "maxclasses",
-        ])!,
+        ]) || null,
+        percent: findKey(att[0], [
+          "attendance_percentage",
+          "attendance%",
+          "attendancepercent",
+          "attendance_pct",
+        ]) || null,
         name:
           findKey(att[0], ["name", "student_name", "studentname"]) || undefined,
         klass:
@@ -195,8 +201,13 @@ export function UploadAndReport({
           "obtained",
           "score",
           "scored",
-        ])!,
-        total: findKey(marks[0], ["total_marks", "total", "max", "maxmarks"])!,
+        ]) || null,
+        total: findKey(marks[0], ["total_marks", "total", "max", "maxmarks"]) || null,
+        percent: findKey(marks[0], [
+          "marks_percentage",
+          "percentage",
+          "score_percent",
+        ]) || null,
         name:
           findKey(marks[0], ["name", "student_name", "studentname"]) ||
           undefined,
@@ -220,8 +231,9 @@ export function UploadAndReport({
           "student_id",
           "id",
         ])!,
-        total: findKey(fees[0], ["total_fee", "feetotal", "total"])!,
-        paid: findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"])!,
+        total: findKey(fees[0], ["total_fee", "feetotal", "total"]) || null,
+        paid: findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"]) || null,
+        status: findKey(fees[0], ["fee_status", "payment_status", "status", "fees_status"]) || null,
         name:
           findKey(fees[0], ["name", "student_name", "studentname"]) ||
           undefined,
@@ -252,9 +264,14 @@ export function UploadAndReport({
       for (const r of att) {
         const id = normId(r[attKeys.id]);
         if (!id) continue;
-        const attended = parseNumber(r[attKeys.attended]);
-        const total = parseNumber(r[attKeys.total]);
-        const pct = (attended / (total || 1)) * 100;
+        let pct = 0;
+        if (attKeys.percent && r[attKeys.percent] != null) {
+          pct = parseNumber(r[attKeys.percent]);
+        } else if (attKeys.attended && attKeys.total) {
+          const attended = parseNumber(r[attKeys.attended]);
+          const total = parseNumber(r[attKeys.total]);
+          pct = (attended / (total || 1)) * 100;
+        }
         attendenceMap.set(id, { Attendence_percentage: pct });
         if (attKeys.name && r[attKeys.name] != null)
           nameMap.set(id, String(r[attKeys.name]));
@@ -266,9 +283,14 @@ export function UploadAndReport({
       for (const r of marks) {
         const id = normId(r[marksKeys.id]);
         if (!id) continue;
-        const obtained = parseNumber(r[marksKeys.obtained]);
-        const total = parseNumber(r[marksKeys.total]);
-        const pct = (obtained / (total || 1)) * 100;
+        let pct = 0;
+        if (marksKeys.percent && r[marksKeys.percent] != null) {
+          pct = parseNumber(r[marksKeys.percent]);
+        } else if (marksKeys.obtained && marksKeys.total) {
+          const obtained = parseNumber(r[marksKeys.obtained]);
+          const total = parseNumber(r[marksKeys.total]);
+          pct = (obtained / (total || 1)) * 100;
+        }
         marksMap.set(id, { marks_percentage: pct });
         if (marksKeys.name && r[marksKeys.name] != null && !nameMap.has(id))
           nameMap.set(id, String(r[marksKeys.name]));
@@ -280,9 +302,15 @@ export function UploadAndReport({
       for (const r of fees) {
         const id = normId(r[feeKeys.id]);
         if (!id) continue;
-        const total = parseNumber(r[feeKeys.total]);
-        const paid = parseNumber(r[feeKeys.paid]);
-        const remaining = total - paid;
+        let remaining = 0;
+        if (feeKeys.total && feeKeys.paid && (r[feeKeys.total] != null || r[feeKeys.paid] != null)) {
+          const total = parseNumber(r[feeKeys.total]);
+          const paid = parseNumber(r[feeKeys.paid]);
+          remaining = total - paid;
+        } else if (feeKeys.status && r[feeKeys.status] != null) {
+          const s = String(r[feeKeys.status]).toLowerCase();
+          if (/(unpaid|pending|overdue|partial|due|late|0)/.test(s)) remaining = 1; else remaining = 0;
+        }
         feeMap.set(id, { fee_remaining: remaining });
         if (feeKeys.name && r[feeKeys.name] != null && !nameMap.has(id))
           nameMap.set(id, String(r[feeKeys.name]));
