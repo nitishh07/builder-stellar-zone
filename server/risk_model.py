@@ -1,146 +1,241 @@
+# robust_student_fee_fix.py
+import re, sys
 import pandas as pd
-from sklearn.cluster import KMeans
+import numpy as np
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-def process_student_data(attendence_file, marks_file, fee_file, output_file="student_risk.xlsx"):
-    attendence_df = pd.read_csv(attendence_file)
-    marks_df = pd.read_csv(marks_file)
-    fee_df = pd.read_csv(fee_file)
+# ---------- Config ----------
+ATT_LOW = 50
+ATT_MID = 75
+MARK_LOW = 40
+MARK_MID = 75
+DROP_W = {"att":0.5, "marks":0.4, "fee":0.1}
 
-    attendence_df.rename(columns={"student rollno.": "student_ID"}, inplace=True)
-    fee_df.rename(columns={"student rollno.": "student_ID"}, inplace=True)
+YES_SET = {"yes","y","paid","true","t","paid_in_full","cleared","cleared_fee","done"}
+NO_SET  = {"no","n","not_paid","unpaid","false","f","pending"}
 
-    df = attendence_df.merge(marks_df, left_on="student_ID", right_index=True, how="inner")
-    df = df.merge(fee_df, on="student_ID", how="inner")
+# ---------- Helpers ----------
+def normalize_columns(df):
+    return df.rename(columns=lambda c: re.sub(r'[^a-z0-9_]', '_', str(c).strip().lower()))
 
-    df = df[["student_ID", "attendence percentage", "marks_percentage", "fee_reamining"]]
+def try_numeric(v):
+    """Attempt to convert to numeric; return np.nan if fails."""
+    if pd.isna(v):
+        return np.nan
+    if isinstance(v, (int, float, np.integer, np.floating)):
+        return float(v)
+    s = str(v).strip()
+    if s == "":
+        return np.nan
+    # percent
+    if s.endswith("%"):
+        try:
+            return float(s.rstrip("%"))
+        except:
+            return np.nan
+    # fraction
+    if "/" in s:
+        try:
+            num, den = s.split("/")
+            return float(num) / float(den) * 100.0
+        except:
+            return np.nan
+    # numeric with commas
+    try:
+        return float(s.replace(",", ""))
+    except:
+        return np.nan
 
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    df["fee_cluster"] = kmeans.fit_predict(df[["fee_reamining"]])
+def series_numeric_ratio(s):
+    """Return proportion of non-null values convertible to numeric."""
+    conv = s.map(try_numeric)
+    return conv.notna().sum() / max(1, s.notna().sum())
 
-    cluster_order = df.groupby("fee_cluster")["fee_reamining"].mean().sort_values().index
-    cluster_mapping = {
-        cluster_order[0]: "Green",
-        cluster_order[1]: "Orange",
-        cluster_order[2]: "Red"
-    }
-    df["fee_risk"] = df["fee_cluster"].map(cluster_mapping)
+def series_yesno_ratio(s):
+    s_str = s.dropna().astype(str).str.strip().str.lower()
+    total = len(s_str)
+    if total == 0:
+        return 0.0
+    yesno = s_str.isin(YES_SET.union(NO_SET))
+    return yesno.sum() / total
 
-    def attendence_risk(x):
-        if x < 50:
-            return "Red"
-        elif x < 75:
-            return "Orange"
+def detect_best_column(df, keywords, prefer_numeric=True):
+    cols = [c for c in df.columns if any(kw in c for kw in keywords)]
+    if not cols:
+        return None
+    best = None; best_score = -1.0
+    for c in cols:
+        nr = series_numeric_ratio(df[c])
+        yr = series_yesno_ratio(df[c])
+        score = nr if prefer_numeric else yr
+        if nr >= 0.5: score = 1.0 + nr
+        if score > best_score:
+            best = c; best_score = score
+    return best
+
+# ---------- Fee remaining logic ----------
+PAID_KW = ["paid","amount_paid","paid_amount","paid_amt","deposit","received","received_amount","fee_paid"]
+
+def compute_fee_remaining(df):
+    df = df.copy()
+    TOTAL_FEE = 10000  # fixed total fee for all students
+
+    # detect paid column
+    paid_col = detect_best_column(df, PAID_KW, prefer_numeric=True)
+
+    if paid_col:
+        paid = df[paid_col].map(try_numeric).fillna(0.0)
+        rem = (TOTAL_FEE - paid).clip(lower=0.0)
+        print(f"Computed fee_remaining as {TOTAL_FEE} - paid('{paid_col}').")
+        return rem.astype(float)
+
+    # fallback: no paid column → assume everyone owes full
+    print(f"Warning: No paid column found, defaulting fee_remaining = {TOTAL_FEE}")
+    return pd.Series([TOTAL_FEE]*len(df), index=df.index, dtype=float)
+
+# ---------- Percentage helpers (attendance/marks) ----------
+def compute_percentage_series(df, value_keywords, total_keywords):
+    pct_col = detect_best_column(df, ["percent","percentage","pct"], prefer_numeric=True)
+    if pct_col and series_numeric_ratio(df[pct_col])>0:
+        s = df[pct_col].map(try_numeric).clip(0,100)
+        return s
+
+    val_col = detect_best_column(df, value_keywords, prefer_numeric=True)
+    tot_col = detect_best_column(df, total_keywords, prefer_numeric=True)
+
+    if val_col:
+        val_ser = df[val_col].astype(str)
+        if val_ser.str.contains("/").any():
+            s = df[val_col].map(try_numeric).clip(0,100)
+            return s
+
+        val_num = df[val_col].map(try_numeric)
+        if tot_col:
+            tot_num = df[tot_col].map(try_numeric).replace(0, np.nan)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                pct = (val_num / tot_num) * 100.0
+            if pct.notna().sum() > 0:
+                return pct.clip(0,100)
+
+        m = val_num.max(skipna=True)
+        if pd.isna(m):
+            return pd.Series([np.nan]*len(df), index=df.index)
+        if m <= 1.0:
+            return (val_num * 100.0).clip(0,100)
+        if m <= 100.0:
+            return val_num.clip(0,100)
+        return (val_num / m * 100.0).clip(0,100)
+
+    return pd.Series([np.nan]*len(df), index=df.index)
+
+# ---------- Main pipeline ----------
+def process_student_data_dfs(att_df, marks_df, fees_df, debug=True):
+    att_df = normalize_columns(att_df.copy())
+    marks_df = normalize_columns(marks_df.copy())
+    fees_df = normalize_columns(fees_df.copy())
+
+    id_att = detect_best_column(att_df, ["student","id","roll","reg","admission"], prefer_numeric=False) or att_df.columns[0]
+    id_marks = detect_best_column(marks_df, ["student","id","roll","reg","admission"], prefer_numeric=False) or marks_df.columns[0]
+    id_fees = detect_best_column(fees_df, ["student","id","roll","reg","admission"], prefer_numeric=False) or fees_df.columns[0]
+
+    att_df = att_df.rename(columns={id_att: "student_id"})
+    marks_df = marks_df.rename(columns={id_marks: "student_id"})
+    fees_df = fees_df.rename(columns={id_fees: "student_id"})
+
+    if debug:
+        print("Detected student id columns:", id_att, id_marks, id_fees)
+        print("Attendance columns:", list(att_df.columns))
+        print("Marks columns:", list(marks_df.columns))
+        print("Fees columns:", list(fees_df.columns))
+
+    att_pct = compute_percentage_series(att_df,
+                                        value_keywords=["attendance","attend","present","attended","days_present"],
+                                        total_keywords=["total","classes","sessions","max_classes"])
+    att_df["attendance_percentage"] = att_pct.round(2)
+
+    marks_pct = compute_percentage_series(marks_df,
+                                          value_keywords=["marks","score","obtained","result"],
+                                          total_keywords=["total","max","out_of"])
+    marks_df["marks_percentage"] = marks_pct.round(2)
+
+    fees_df["fee_remaining"] = compute_fee_remaining(fees_df).fillna(0.0).astype(float)
+
+    df = pd.merge(att_df[["student_id","attendance_percentage"]], marks_df[["student_id","marks_percentage"]], on="student_id", how="outer")
+    df = pd.merge(df, fees_df[["student_id","fee_remaining"]], on="student_id", how="outer")
+
+    df["attendance_percentage"] = df["attendance_percentage"].round(2)
+    df["marks_percentage"] = df["marks_percentage"].round(2)
+    df["fee_remaining"] = df["fee_remaining"].fillna(0.0).astype(float)
+
+    def risk_att(v):
+        if pd.isna(v): return "Red"
+        if v < ATT_LOW: return "Red"
+        if v < ATT_MID: return "Orange"
+        return "Green"
+    def risk_marks(v):
+        if pd.isna(v): return "Red"
+        if v < MARK_LOW: return "Red"
+        if v < MARK_MID: return "Orange"
         return "Green"
 
-    def marks_risk(x):
-        if x < 40:
-            return "Red"
-        elif x < 75:
-            return "Orange"
-        return "Green"
+    fee_max = df["fee_remaining"].max(skipna=True)
+    if pd.isna(fee_max) or fee_max == 0:
+        df["fee_risk"] = "Green"
+    else:
+        df["fee_ratio"] = df["fee_remaining"] / fee_max
+        df["fee_risk"] = "Green"
+        df.loc[df["fee_ratio"] > 0.25, "fee_risk"] = "Orange"
+        df.loc[df["fee_ratio"] > 0.60, "fee_risk"] = "Red"
+        df.drop(columns=["fee_ratio"], inplace=True)
 
-    df["Attendance_risk"] = df["attendence percentage"].apply(attendence_risk)
-    df["Marks_risk"] = df["marks_percentage"].apply(marks_risk)
+    df["attendance_risk"] = df["attendance_percentage"].apply(risk_att)
+    df["marks_risk"] = df["marks_percentage"].apply(risk_marks)
 
-    df.to_excel(output_file, index=False)
-    wb = load_workbook(output_file)
-    ws = wb.active
-    color_map = {"Red": "FF9999", "Orange": "FFD580", "Green": "99FF99"}
-    for col_name in ["fee_risk", "Attendance_risk", "Marks_risk"]:
-        col_idx = [cell.value for cell in ws[1]].index(col_name) + 1
-        for row in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row, column=col_idx)
-            if cell.value in color_map:
-                cell.fill = PatternFill(
-                    start_color=color_map[cell.value],
-                    end_color=color_map[cell.value],
-                    fill_type="solid"
-                )
-    wb.save(output_file)
+    att_comp = (100.0 - df["attendance_percentage"].fillna(50.0)) / 100.0
+    marks_comp = (100.0 - df["marks_percentage"].fillna(50.0)) / 100.0
+    fee_max2 = df["fee_remaining"].max(skipna=True)
+    fee_comp = df["fee_remaining"].fillna(0.0) / (fee_max2 + 1e-9) if fee_max2 and fee_max2>0 else df["fee_remaining"].fillna(0.0).apply(lambda x: 1.0 if x>0 else 0.0)
+    df["dropout_probability"] = (DROP_W["att"]*att_comp + DROP_W["marks"]*marks_comp + DROP_W["fee"]*fee_comp).clip(0,1)
+
+    cols_order = ["student_id","attendance_percentage","marks_percentage","fee_remaining","attendance_risk","marks_risk","fee_risk","dropout_probability"]
+    df = df[[c for c in cols_order if c in df.columns]]
+
+    if debug:
+        print("Processed sample:")
+        print(df.head(10).to_string(index=False))
     return df
 
-def simulate_future_risk(student_row, new_attendance=None, new_marks=None):
-    att = new_attendance if new_attendance is not None else student_row["attendence percentage"]
-    marks = new_marks if new_marks is not None else student_row["marks_percentage"]
-    fee = student_row["fee_reamining"]
-    dropout_prob = 0.4 * (100 - att) / 100 + 0.4 * (100 - marks) / 100 + 0.2 * (fee > 0)
-    dropout_prob = round(dropout_prob * 100, 2)
-    return f"If current trend continues, probability of dropout = {dropout_prob}%"
+# ---------- Save with colors ----------
+def save_with_colors(df, out_file="student_risk_fixed.xlsx"):
+    df.to_excel(out_file, index=False)
+    wb = load_workbook(out_file)
+    ws = wb.active
+    color_map = {"Red":"FF9999","Orange":"FFD580","Green":"99FF99"}
+    headers = [cell.value for cell in ws[1]]
+    for rc in ["attendance_risk","marks_risk","fee_risk"]:
+        if rc in headers:
+            idx = headers.index(rc) + 1
+            for r in range(2, ws.max_row+1):
+                v = ws.cell(row=r, column=idx).value
+                if v in color_map:
+                    ws.cell(row=r, column=idx).fill = PatternFill(start_color=color_map[v], end_color=color_map[v], fill_type="solid")
+    wb.save(out_file)
+    print("Saved:", out_file)
 
-def query_students(df, query: str):
-    query = query.lower()
-    if "top" in query and "red" in query:
-        result = df[(df["Attendance_risk"]=="Red") | 
-                    (df["Marks_risk"]=="Red") | 
-                    (df["fee_risk"]=="Red")].head(5)
-        return result[["student_ID", "Attendance_risk", "Marks_risk", "fee_risk"]]
-    elif "orange" in query:
-        result = df[(df["Attendance_risk"]=="Orange") | 
-                    (df["Marks_risk"]=="Orange") | 
-                    (df["fee_risk"]=="Orange")].head(5)
-        return result[["student_ID", "Attendance_risk", "Marks_risk", "fee_risk"]]
+# ---------- CLI ----------
+if _name_ == "_main_":
+    argv = sys.argv[1:]
+    if len(argv) >= 3:
+        att_path, marks_path, fees_path = argv[:3]
     else:
-        return "Query not understood"
+        att_path = "attendence3.csv"
+        marks_path = "assessment3.csv"
+        fees_path = "fee3.csv"
 
-def interactive_simulator(df):
-    student_id = input("Enter student ID: ").strip()
-    if student_id not in df["student_ID"].astype(str).values:
-        print("Student ID not found.")
-        return
-    student_row = df[df["student_ID"].astype(str) == student_id].iloc[0]
-    print(f"\nCurrent values for {student_id}:")
-    print(f"Attendance: {student_row['attendence percentage']}%")
-    print(f"Marks: {student_row['marks_percentage']}%")
-    print(f"Fee Remaining: {student_row['fee_reamining']}")
-    try:
-        new_att = input("Enter new Attendance % (or press Enter to keep current): ")
-        new_marks = input("Enter new Marks % (or press Enter to keep current): ")
-        new_att = float(new_att) if new_att else student_row['attendence percentage']
-        new_marks = float(new_marks) if new_marks else student_row['marks_percentage']
-        att_risk = "Red" if new_att < 50 else "Orange" if new_att < 75 else "Green"
-        marks_risk = "Red" if new_marks < 40 else "Orange" if new_marks < 75 else "Green"
-        fee_risk = student_row["fee_risk"]
-        print("\nSimulated Risk Levels")
-        print(f"Attendance Risk: {att_risk}")
-        print(f"Marks Risk: {marks_risk}")
-        print(f"Fee Risk: {fee_risk}")
-        print(simulate_future_risk(student_row, new_attendance=new_att, new_marks=new_marks))
-    except ValueError:
-        print("Invalid input")
+    att = pd.read_csv(att_path)
+    marks = pd.read_csv(marks_path)
+    fees = pd.read_csv(fees_path)
 
-df_result = process_student_data("attendence.csv", "marks.csv", "fee.csv")
-print(simulate_future_risk(df_result.iloc[0], new_attendance=70))
-interactive_simulator(df_result)
-
-def mentor_bot(df):
-    print("Mentor Chat Bot. Type 'exit' to quit.\n")
-    while True:
-        query = input("You: ").strip()
-        if query.lower() == "exit":
-            print("Bot: Bye!")
-            break
-        query_lower = query.lower()
-        if "red" in query_lower:
-            result = df[(df["Attendance_risk"]=="Red") | 
-                        (df["Marks_risk"]=="Red") | 
-                        (df["fee_risk"]=="Red")].head(5)
-        elif "orange" in query_lower:
-            result = df[(df["Attendance_risk"]=="Orange") | 
-                        (df["Marks_risk"]=="Orange") | 
-                        (df["fee_risk"]=="Orange")].head(5)
-        else:
-            print("Bot: Query not understood")
-            continue
-        if result.empty:
-            print("Bot: No students found.")
-        else:
-            for _, row in result.iterrows():
-                print(f"Student ID: {row['student_ID']}, "
-                      f"Attendance Risk: {row['Attendance_risk']}, "
-                      f"Marks Risk: {row['Marks_risk']}, "
-                      f"Fee Risk: {row['fee_risk']}")
-            print("\n")
-
-mentor_bot(df_result)
+    result = process_student_data_dfs(att, marks, fees, debug=True)
+    save_with_colors(result, "student_risk_fixed2.xlsx")
