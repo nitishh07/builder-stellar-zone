@@ -150,6 +150,20 @@ export default function Auth() {
                 <Button variant="outline" asChild>
                   <a href="/notifications">View Notifications</a>
                 </Button>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      await signInAnonymously();
+                      toast.success("Signed in as guest");
+                      window.location.href = "/dashboard";
+                    } catch (e: any) {
+                      toast.error(e?.message || "Guest sign-in failed");
+                    }
+                  }}
+                >
+                  Continue as Guest
+                </Button>
               </div>
             </div>
           </div>
