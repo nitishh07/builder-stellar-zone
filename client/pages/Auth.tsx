@@ -15,6 +15,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fullName, setFullName] = useState("");
 
   const { signIn, signUp, signInWithGithub } = useAuth();
 
@@ -32,6 +33,7 @@ export default function Auth() {
     }
 
     if (nextMode === "signup") {
+      if (!fullName.trim()) return setError("Please enter your full name");
       if (!hasMinLen) return setError("Password must be at least 6 characters long");
       if (!hasLetter) return setError("Password must contain at least one letter");
       if (!hasNumber) return setError("Password must contain at least one number");
@@ -43,7 +45,7 @@ export default function Auth() {
         toast.success("Logged in");
         window.location.href = "/dashboard";
       } else {
-        await signUp(email, password, { role: "student" });
+        await signUp(email, password, { role: "student", full_name: fullName.trim() });
         // If signup didn't create a session (email confirmation), try immediate login
         try {
           await signIn(email, password);
@@ -161,6 +163,18 @@ export default function Auth() {
                       handleAuth("signup");
                     }}
                   >
+                    <div className="space-y-2">
+                      <Label htmlFor="name2">Full name</Label>
+                      <Input
+                        id="name2"
+                        type="text"
+                        required
+                        placeholder="Your full name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        autoComplete="name"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="email2">Email</Label>
                       <Input

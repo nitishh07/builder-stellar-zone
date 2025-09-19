@@ -9,6 +9,7 @@ import { students } from "@/data/students";
 import type { Student, FeeStatus } from "@/data/students";
 import { BellRing } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Dashboard() {
   const [selected, setSelected] = useState<Student | null>(null);
@@ -49,6 +50,9 @@ export default function Dashboard() {
     }));
   }, [csvRows]);
 
+  const { user } = useAuth();
+  const displayName = (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "User") as string;
+
   return (
     <AppShell>
       <section className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[260px_1fr] lg:px-8">
@@ -75,7 +79,7 @@ export default function Dashboard() {
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
               <div>
-                <h1 className="text-lg font-semibold leading-tight">Mentor Dashboard</h1>
+                <h1 className="text-lg font-semibold leading-tight">Welcome, {displayName}</h1>
                 <p className="text-sm text-muted-foreground">Identify and act on at-risk students quickly.</p>
               </div>
             </div>
