@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient";
+import { getSupabase, tryGetSupabase } from "./supabaseClient";
 
 export const authService = {
   async signUp(email: string, password: string, userData: Record<string, any> = {}) {
@@ -45,6 +45,10 @@ export const authService = {
     return user;
   },
   onAuthStateChange(callback: Parameters<ReturnType<typeof getSupabase>["auth"]["onAuthStateChange"]>[0]) {
-    return getSupabase().auth.onAuthStateChange(callback);
+    const c = tryGetSupabase();
+    if (!c) {
+      return { data: { subscription: { unsubscribe() {} } } } as any;
+    }
+    return c.auth.onAuthStateChange(callback);
   },
 };
