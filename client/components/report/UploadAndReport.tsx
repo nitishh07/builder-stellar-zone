@@ -153,26 +153,29 @@ export function UploadAndReport({
           "student_id",
           "id",
         ])!,
-        attended: findKey(att[0], [
-          "Class_attended",
-          "classes_attended",
-          "attended",
-          "present",
-          "classespresent",
-        ]) || null,
-        total: findKey(att[0], [
-          "Total_classes",
-          "total_classes",
-          "total",
-          "classes",
-          "maxclasses",
-        ]) || null,
-        percent: findKey(att[0], [
-          "attendance_percentage",
-          "attendance%",
-          "attendancepercent",
-          "attendance_pct",
-        ]) || null,
+        attended:
+          findKey(att[0], [
+            "Class_attended",
+            "classes_attended",
+            "attended",
+            "present",
+            "classespresent",
+          ]) || null,
+        total:
+          findKey(att[0], [
+            "Total_classes",
+            "total_classes",
+            "total",
+            "classes",
+            "maxclasses",
+          ]) || null,
+        percent:
+          findKey(att[0], [
+            "attendance_percentage",
+            "attendance%",
+            "attendancepercent",
+            "attendance_pct",
+          ]) || null,
         name:
           findKey(att[0], ["name", "student_name", "studentname"]) || undefined,
         klass:
@@ -195,19 +198,23 @@ export function UploadAndReport({
           "student_id",
           "id",
         ])!,
-        obtained: findKey(marks[0], [
-          "marks_obtained",
-          "marks",
-          "obtained",
-          "score",
-          "scored",
-        ]) || null,
-        total: findKey(marks[0], ["total_marks", "total", "max", "maxmarks"]) || null,
-        percent: findKey(marks[0], [
-          "marks_percentage",
-          "percentage",
-          "score_percent",
-        ]) || null,
+        obtained:
+          findKey(marks[0], [
+            "marks_obtained",
+            "marks",
+            "obtained",
+            "score",
+            "scored",
+          ]) || null,
+        total:
+          findKey(marks[0], ["total_marks", "total", "max", "maxmarks"]) ||
+          null,
+        percent:
+          findKey(marks[0], [
+            "marks_percentage",
+            "percentage",
+            "score_percent",
+          ]) || null,
         name:
           findKey(marks[0], ["name", "student_name", "studentname"]) ||
           undefined,
@@ -232,8 +239,16 @@ export function UploadAndReport({
           "id",
         ])!,
         total: findKey(fees[0], ["total_fee", "feetotal", "total"]) || null,
-        paid: findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"]) || null,
-        status: findKey(fees[0], ["fee_status", "payment_status", "status", "fees_status"]) || null,
+        paid:
+          findKey(fees[0], ["fee_paid", "feepaid", "paid", "amount_paid"]) ||
+          null,
+        status:
+          findKey(fees[0], [
+            "fee_status",
+            "payment_status",
+            "status",
+            "fees_status",
+          ]) || null,
         name:
           findKey(fees[0], ["name", "student_name", "studentname"]) ||
           undefined,
@@ -303,13 +318,19 @@ export function UploadAndReport({
         const id = normId(r[feeKeys.id]);
         if (!id) continue;
         let remaining = 0;
-        if (feeKeys.total && feeKeys.paid && (r[feeKeys.total] != null || r[feeKeys.paid] != null)) {
+        if (
+          feeKeys.total &&
+          feeKeys.paid &&
+          (r[feeKeys.total] != null || r[feeKeys.paid] != null)
+        ) {
           const total = parseNumber(r[feeKeys.total]);
           const paid = parseNumber(r[feeKeys.paid]);
           remaining = total - paid;
         } else if (feeKeys.status && r[feeKeys.status] != null) {
           const s = String(r[feeKeys.status]).toLowerCase();
-          if (/(unpaid|pending|overdue|partial|due|late|0)/.test(s)) remaining = 1; else remaining = 0;
+          if (/(unpaid|pending|overdue|partial|due|late|0)/.test(s))
+            remaining = 1;
+          else remaining = 0;
         }
         feeMap.set(id, { fee_remaining: remaining });
         if (feeKeys.name && r[feeKeys.name] != null && !nameMap.has(id))
