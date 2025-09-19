@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authService } from "@/lib/authService";
+import { isSupabaseConfigured } from "@/lib/supabaseClient";
 
 interface AuthCtx {
   user: any;
@@ -26,6 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const sess = await authService.getSession();
