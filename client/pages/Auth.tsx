@@ -7,17 +7,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Github } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  function handleAuth(mode: "login" | "signup") {
-    toast(`Supabase ${mode} not configured. Connect Supabase MCP to enable auth.`);
+  const { signIn, signUp, signInWithGithub } = useAuth();
+
+  async function handleAuth(mode: "login" | "signup") {
+    try {
+      if (mode === "login") {
+        await signIn(email, password);
+        toast.success("Logged in");
+        window.location.href = "/dashboard";
+      } else {
+        await signUp(email, password, { role: "mentor" });
+        toast.success("Signup successful. Check your email to verify.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Auth error");
+    }
   }
 
-  function handleGithub() {
-    toast("GitHub login not configured. Connect Supabase/GitHub to enable.");
+  async function handleGithub() {
+    try {
+      await signInWithGithub();
+    } catch (e: any) {
+      toast.error(e?.message || "GitHub auth error");
+    }
   }
 
   return (

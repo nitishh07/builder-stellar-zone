@@ -53,7 +53,7 @@ export function Header() {
                 <Avatar className="size-7">
                   <AvatarFallback>MN</AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm font-medium sm:inline">Mentor Name</span>
+                <span className="hidden text-sm font-medium sm:inline">Mentor</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
