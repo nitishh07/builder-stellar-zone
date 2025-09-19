@@ -11,55 +11,62 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Auth() {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [fullName, setFullName] = useState("");
+
+  // Login-only state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  // Signup-only state
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
 
   const { signIn, signUp, signInWithGithub } = useAuth();
 
-  const hasMinLen = password.length >= 6;
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasNumber = /\d/.test(password);
+  const hasMinLen = signupPassword.length >= 6;
+  const hasLetter = /[a-zA-Z]/.test(signupPassword);
+  const hasNumber = /\d/.test(signupPassword);
 
   async function handleAuth(nextMode: "login" | "signup") {
     setError("");
     setSuccess("");
 
-    if (!email || !password) {
-      setError("Please fill in all fields");
+    if (nextMode === "login") {
+      if (!loginEmail || !loginPassword) return setError("Please fill in all fields");
+      try {
+        await signIn(loginEmail, loginPassword);
+        toast.success("Logged in");
+        window.location.href = "/dashboard";
+      } catch (e: any) {
+        const raw = e?.message || "Authentication error";
+        const msg = /user_not_found/i.test(e?.code || "") || /invalid login credentials/i.test(raw)
+          ? "Account not found. Please create an account."
+          : raw;
+        setError(msg);
+        toast.error(msg);
+      }
       return;
     }
 
-    if (nextMode === "signup") {
-      if (!fullName.trim()) return setError("Please enter your full name");
-      if (!hasMinLen) return setError("Password must be at least 6 characters long");
-      if (!hasLetter) return setError("Password must contain at least one letter");
-      if (!hasNumber) return setError("Password must contain at least one number");
-    }
+    // signup path
+    if (!signupName.trim() || !signupEmail || !signupPassword) return setError("Please fill in all fields");
+    if (!hasMinLen) return setError("Password must be at least 6 characters long");
+    if (!hasLetter) return setError("Password must contain at least one letter");
+    if (!hasNumber) return setError("Password must contain at least one number");
 
     try {
-      if (nextMode === "login") {
-        await signIn(email, password);
-        toast.success("Logged in");
+      await signUp(signupEmail, signupPassword, { role: "student", full_name: signupName.trim() });
+      try {
+        await signIn(signupEmail, signupPassword);
         window.location.href = "/dashboard";
-      } else {
-        await signUp(email, password, { role: "student", full_name: fullName.trim() });
-        // If signup didn't create a session (email confirmation), try immediate login
-        try {
-          await signIn(email, password);
-          window.location.href = "/dashboard";
-        } catch (err) {
-          toast.success("Account created. Please verify your email, then log in.");
-          setSuccess("Account created. Please verify your email, then log in.");
-        }
+      } catch {
+        toast.success("Account created. Please verify your email, then log in.");
+        setSuccess("Account created. Please verify your email, then log in.");
       }
     } catch (e: any) {
-      const raw = e?.message || "Authentication error";
-      const msg = /user_not_found/i.test(e?.code || "") || /invalid login credentials/i.test(raw)
-        ? "Account not found. Please create an account."
-        : raw;
+      const msg = e?.message || "Authentication error";
       setError(msg);
       toast.error(msg);
     }
@@ -80,6 +87,18 @@ export default function Auth() {
     }
   }
 
+  function onTabChange(v: string) {
+    setMode(v as any);
+    setError("");
+    setSuccess("");
+    // Clear both forms when switching to avoid any pre-filled values
+    setLoginEmail("");
+    setLoginPassword("");
+    setSignupName("");
+    setSignupEmail("");
+    setSignupPassword("");
+  }
+
   return (
     <AppShell>
       <section className="relative mx-auto flex min-h-[calc(100vh-7rem)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 sm:px-6 lg:px-8" data-loc="client/pages/Auth.tsx:43:7">
@@ -94,7 +113,7 @@ export default function Auth() {
               <p className="mb-4 text-sm text-muted-foreground" data-loc="client/pages/Auth.tsx:52:15">
                 Sign in to continue to Student Risk Monitoring & Counselling System
               </p>
-              <Tabs value={mode} onValueChange={(v) => { setMode(v as any); setError(""); setSuccess(""); }} className="w-full">
+              <Tabs value={mode} onValueChange={onTabChange} className="w-full">
                 <TabsList className="grid w-full grid-cols-2" data-loc="client/pages/Auth.tsx:55:15">
                   <TabsTrigger value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Signup</TabsTrigger>
@@ -102,6 +121,7 @@ export default function Auth() {
                 <TabsContent value="login" data-loc="client/components/ui/tabs.tsx:42:3">
                   <form
                     className="mt-4 space-y-4"
+                    autoComplete="off"
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleAuth("login");
@@ -109,27 +129,27 @@ export default function Auth() {
                     data-loc="client/pages/Auth.tsx:103:19"
                   >
                     <div className="space-y-2" data-loc="client/pages/Auth.tsx:110:21">
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="login-email">Email</Label>
                       <Input
-                        id="email"
+                        id="login-email"
                         type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
                         required
                         placeholder="you@school.edu"
                         data-loc="client/components/ui/input.tsx:8:7"
-                        autoComplete="email"
+                        autoComplete="off"
                       />
                     </div>
                     <div className="space-y-2" data-loc="client/pages/Auth.tsx:114:21">
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="login-password">Password</Label>
                       <Input
-                        id="password"
+                        id="login-password"
                         type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
                         required
-                        autoComplete="current-password"
+                        autoComplete="off"
                       />
                     </div>
                     {error && (
@@ -158,49 +178,50 @@ export default function Auth() {
                 <TabsContent value="signup">
                   <form
                     className="mt-4 space-y-4"
+                    autoComplete="off"
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleAuth("signup");
                     }}
                   >
                     <div className="space-y-2">
-                      <Label htmlFor="name2">Full name</Label>
+                      <Label htmlFor="signup-name">Full name</Label>
                       <Input
-                        id="name2"
+                        id="signup-name"
                         type="text"
                         required
                         placeholder="Your full name"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        autoComplete="name"
+                        value={signupName}
+                        onChange={(e) => setSignupName(e.target.value)}
+                        autoComplete="off"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email2">Email</Label>
+                      <Label htmlFor="signup-email">Email</Label>
                       <Input
-                        id="email2"
+                        id="signup-email"
                         type="email"
                         required
                         placeholder="you@school.edu"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        autoComplete="email"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        autoComplete="off"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="password2">Password</Label>
+                      <Label htmlFor="signup-password">Password</Label>
                       <Input
-                        id="password2"
+                        id="signup-password"
                         type="password"
                         required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="new-password"
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        autoComplete="off"
                       />
-                      {password.length > 0 && (
+                      {signupPassword.length > 0 && (
                         <div className="mt-1 text-xs space-y-1">
                           <div className={hasMinLen ? "text-green-600" : "text-red-600"}>
-                            ✓ At least 6 characters ({password.length}/6)
+                            ✓ At least 6 characters ({signupPassword.length}/6)
                           </div>
                           <div className={hasLetter ? "text-green-600" : "text-red-600"}>✓ Contains letters</div>
                           <div className={hasNumber ? "text-green-600" : "text-red-600"}>✓ Contains numbers</div>
