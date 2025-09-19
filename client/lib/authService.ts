@@ -24,6 +24,11 @@ export const authService = {
     if (error) throw error;
     return data;
   },
+  async signInAnonymously() {
+    const { data, error } = await getSupabase().auth.signInAnonymously();
+    if (error) throw error;
+    return data;
+  },
   async resetPassword(email: string) {
     const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
