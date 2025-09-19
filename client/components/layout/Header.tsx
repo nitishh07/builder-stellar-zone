@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) => {
   const active = typeof window !== "undefined" && window.location?.pathname === to;
@@ -22,7 +23,24 @@ const NavLink = ({ to, children }: { to: string; children: React.ReactNode }) =>
   );
 };
 
+function getDisplay(user: any) {
+  const email: string | undefined = user?.email || user?.user_metadata?.email;
+  const fullName: string | undefined = user?.user_metadata?.full_name || user?.user_metadata?.name;
+  const usernameFromEmail = email ? email.split("@")[0] : undefined;
+  const display = fullName || usernameFromEmail || "Guest";
+  const initials = (fullName || usernameFromEmail || "G")
+    .split(/\s|_/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s: string) => s[0]?.toUpperCase())
+    .join("") || "G";
+  return { display, email: email || "guest@example.com", initials };
+}
+
 export function Header() {
+  const { user, signOut } = useAuth();
+  const meta = getDisplay(user);
+
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -51,16 +69,16 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2">
                 <Avatar className="size-7">
-                  <AvatarFallback>MN</AvatarFallback>
+                  <AvatarFallback>{meta.initials}</AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm font-medium sm:inline">Mentor</span>
+                <span className="hidden text-sm font-medium sm:inline">{meta.display}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex items-center gap-2">
                 <User className="size-4" />
                 Signed in as
-                <span className="ml-auto font-semibold">mentor@example.com</span>
+                <span className="ml-auto font-semibold">{meta.email}</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -69,7 +87,17 @@ export function Header() {
                 </a>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => toast("Logged out (prototype)")}>
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await signOut();
+                    toast.success("Logged out");
+                    window.location.href = "/auth";
+                  } catch (e: any) {
+                    toast.error(e?.message || "Logout failed");
+                  }
+                }}
+              >
                 <LogOut className="mr-2 size-4" />
                 <span>Logout</span>
               </DropdownMenuItem>
