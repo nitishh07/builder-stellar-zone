@@ -43,7 +43,7 @@ export default function Auth() {
         toast.success("Logged in");
         window.location.href = "/dashboard";
       } else {
-        const result = await signUp(email, password, { role: "student" });
+        await signUp(email, password, { role: "student" });
         // If signup didn't create a session (email confirmation), try immediate login
         try {
           await signIn(email, password);
