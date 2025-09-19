@@ -16,7 +16,7 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const { signIn, signUp, signInWithGithub, signInAnonymously } = useAuth();
+  const { signIn, signUp, signInWithGithub } = useAuth();
 
   const hasMinLen = password.length >= 6;
   const hasLetter = /[a-zA-Z]/.test(password);
@@ -41,15 +41,23 @@ export default function Auth() {
       if (nextMode === "login") {
         await signIn(email, password);
         toast.success("Logged in");
-        setSuccess("Logged in successfully!");
         window.location.href = "/dashboard";
       } else {
-        await signUp(email, password, { role: "student" });
-        toast.success("Account created. Check your email to verify");
-        setSuccess("Account created successfully! You are now logged in.");
+        const result = await signUp(email, password, { role: "student" });
+        // If signup didn't create a session (email confirmation), try immediate login
+        try {
+          await signIn(email, password);
+          window.location.href = "/dashboard";
+        } catch (err) {
+          toast.success("Account created. Please verify your email, then log in.");
+          setSuccess("Account created. Please verify your email, then log in.");
+        }
       }
     } catch (e: any) {
-      const msg = e?.message || "Authentication error";
+      const raw = e?.message || "Authentication error";
+      const msg = /user_not_found/i.test(e?.code || "") || /invalid login credentials/i.test(raw)
+        ? "Account not found. Please create an account."
+        : raw;
       setError(msg);
       toast.error(msg);
     }
@@ -105,6 +113,7 @@ export default function Auth() {
                         required
                         placeholder="you@school.edu"
                         data-loc="client/components/ui/input.tsx:8:7"
+                        autoComplete="email"
                       />
                     </div>
                     <div className="space-y-2" data-loc="client/pages/Auth.tsx:114:21">
@@ -115,6 +124,7 @@ export default function Auth() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        autoComplete="current-password"
                       />
                     </div>
                     {error && (
@@ -157,6 +167,7 @@ export default function Auth() {
                         placeholder="you@school.edu"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
                       />
                     </div>
                     <div className="space-y-2">
@@ -167,14 +178,17 @@ export default function Auth() {
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
                       />
-                      <div className="mt-1 text-xs space-y-1">
-                        <div className={hasMinLen ? "text-green-600" : "text-red-600"}>
-                          ✓ At least 6 characters ({password.length}/6)
+                      {password.length > 0 && (
+                        <div className="mt-1 text-xs space-y-1">
+                          <div className={hasMinLen ? "text-green-600" : "text-red-600"}>
+                            ✓ At least 6 characters ({password.length}/6)
+                          </div>
+                          <div className={hasLetter ? "text-green-600" : "text-red-600"}>✓ Contains letters</div>
+                          <div className={hasNumber ? "text-green-600" : "text-red-600"}>✓ Contains numbers</div>
                         </div>
-                        <div className={hasLetter ? "text-green-600" : "text-red-600"}>✓ Contains letters</div>
-                        <div className={hasNumber ? "text-green-600" : "text-red-600"}>✓ Contains numbers</div>
-                      </div>
+                      )}
                     </div>
                     {error && (
                       <div className="rounded-md border border-red-200 bg-red-50 p-3">
@@ -220,24 +234,6 @@ export default function Auth() {
                 </Button>
                 <Button variant="outline" asChild>
                   <a href="/notifications">View Notifications</a>
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={async () => {
-                    setError("");
-                    setSuccess("");
-                    try {
-                      await signInAnonymously();
-                      toast.success("Signed in as guest");
-                      window.location.href = "/dashboard";
-                    } catch (e: any) {
-                      const msg = e?.message || "Guest sign-in failed";
-                      setError(msg);
-                      toast.error(msg);
-                    }
-                  }}
-                >
-                  Continue as Guest
                 </Button>
               </div>
             </div>
