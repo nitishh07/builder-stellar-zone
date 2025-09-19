@@ -69,9 +69,12 @@ export default function Auth() {
     try {
       await signInWithGithub();
     } catch (e: any) {
-      const msg = e?.message || "GitHub auth error";
-      setError(msg);
-      toast.error(msg);
+      const raw = e?.message || "GitHub auth error";
+      const friendly = /provider is not enabled/i.test(raw)
+        ? "Enable GitHub provider in Supabase (Auth → Providers) and configure the callback URL."
+        : raw;
+      setError(friendly);
+      toast.error(friendly);
     }
   }
 
