@@ -10,6 +10,7 @@ interface AuthCtx {
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   signInWithGithub: () => Promise<any>;
+  signInAnonymously: () => Promise<any>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
 }
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn: async (email, password) => authService.signIn(email, password),
     signOut: async () => authService.signOut(),
     signInWithGithub: async () => authService.signInWithGithub(),
+    signInAnonymously: async () => authService.signInAnonymously(),
     resetPassword: async (email) => authService.resetPassword(email),
     updatePassword: async (pwd) => authService.updatePassword(pwd),
   };
