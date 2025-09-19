@@ -10,62 +10,92 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Auth() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const { signIn, signUp, signInWithGithub } = useAuth();
+  const { signIn, signUp, signInWithGithub, signInAnonymously } = useAuth();
 
-  async function handleAuth(mode: "login" | "signup") {
+  const hasMinLen = password.length >= 6;
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+
+  async function handleAuth(nextMode: "login" | "signup") {
+    setError("");
+    setSuccess("");
+
+    if (!email || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (nextMode === "signup") {
+      if (!hasMinLen) return setError("Password must be at least 6 characters long");
+      if (!hasLetter) return setError("Password must contain at least one letter");
+      if (!hasNumber) return setError("Password must contain at least one number");
+    }
+
     try {
-      if (mode === "login") {
+      if (nextMode === "login") {
         await signIn(email, password);
         toast.success("Logged in");
+        setSuccess("Logged in successfully!");
         window.location.href = "/dashboard";
       } else {
-        await signUp(email, password, { role: "mentor" });
-        toast.success("Signup successful. Check your email to verify.");
+        await signUp(email, password, { role: "student" });
+        toast.success("Account created. Check your email to verify");
+        setSuccess("Account created successfully! You are now logged in.");
       }
     } catch (e: any) {
-      toast.error(e?.message || "Auth error");
+      const msg = e?.message || "Authentication error";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
   async function handleGithub() {
+    setError("");
+    setSuccess("");
     try {
       await signInWithGithub();
     } catch (e: any) {
-      toast.error(e?.message || "GitHub auth error");
+      const msg = e?.message || "GitHub auth error";
+      setError(msg);
+      toast.error(msg);
     }
   }
 
   return (
     <AppShell>
-      <section className="relative mx-auto flex min-h-[calc(100vh-7rem)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
+      <section className="relative mx-auto flex min-h-[calc(100vh-7rem)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 sm:px-6 lg:px-8" data-loc="client/pages/Auth.tsx:43:7">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(40rem_20rem_at_20%_0%,hsl(var(--brand-400)/.25),transparent),radial-gradient(40rem_20rem_at_80%_0%,hsl(var(--brand-500)/.20),transparent)]"
         />
-        <div className="grid w-full grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="grid w-full grid-cols-1 gap-8 lg:grid-cols-2" data-loc="client/pages/Auth.tsx:48:9">
           <div className="order-2 lg:order-1">
-            <Card className="mx-auto w-full max-w-md p-6 shadow-lg">
-              <h1 className="mb-1 text-xl font-semibold">Welcome back</h1>
-              <p className="mb-4 text-sm text-muted-foreground">
+            <Card className="mx-auto w-full max-w-md p-6 shadow-lg" data-loc="client/components/ui/card.tsx:9:3">
+              <h1 className="mb-1 text-xl font-semibold" data-loc="client/pages/Auth.tsx:51:15">Welcome back</h1>
+              <p className="mb-4 text-sm text-muted-foreground" data-loc="client/pages/Auth.tsx:52:15">
                 Sign in to continue to Student Risk Monitoring & Counselling System
               </p>
-              <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+              <Tabs value={mode} onValueChange={(v) => { setMode(v as any); setError(""); setSuccess(""); }} className="w-full">
+                <TabsList className="grid w-full grid-cols-2" data-loc="client/pages/Auth.tsx:55:15">
                   <TabsTrigger value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Signup</TabsTrigger>
                 </TabsList>
-                <TabsContent value="login">
+                <TabsContent value="login" data-loc="client/components/ui/tabs.tsx:42:3">
                   <form
                     className="mt-4 space-y-4"
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleAuth("login");
                     }}
+                    data-loc="client/pages/Auth.tsx:103:19"
                   >
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-loc="client/pages/Auth.tsx:110:21">
                       <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
@@ -74,9 +104,10 @@ export default function Auth() {
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         placeholder="you@school.edu"
+                        data-loc="client/components/ui/input.tsx:8:7"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-loc="client/pages/Auth.tsx:114:21">
                       <Label htmlFor="password">Password</Label>
                       <Input
                         id="password"
@@ -86,6 +117,16 @@ export default function Auth() {
                         required
                       />
                     </div>
+                    {error && (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    )}
+                    {success && (
+                      <div className="rounded-md border border-green-200 bg-green-50 p-3">
+                        <p className="text-sm text-green-800">{success}</p>
+                      </div>
+                    )}
                     <Button type="submit" className="w-full">
                       Continue
                     </Button>
@@ -109,12 +150,42 @@ export default function Auth() {
                   >
                     <div className="space-y-2">
                       <Label htmlFor="email2">Email</Label>
-                      <Input id="email2" type="email" required placeholder="you@school.edu" />
+                      <Input
+                        id="email2"
+                        type="email"
+                        required
+                        placeholder="you@school.edu"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password2">Password</Label>
-                      <Input id="password2" type="password" required />
+                      <Input
+                        id="password2"
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <div className="mt-1 text-xs space-y-1">
+                        <div className={hasMinLen ? "text-green-600" : "text-red-600"}>
+                          ✓ At least 6 characters ({password.length}/6)
+                        </div>
+                        <div className={hasLetter ? "text-green-600" : "text-red-600"}>✓ Contains letters</div>
+                        <div className={hasNumber ? "text-green-600" : "text-red-600"}>✓ Contains numbers</div>
+                      </div>
                     </div>
+                    {error && (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                        <p className="text-sm text-red-800">{error}</p>
+                      </div>
+                    )}
+                    {success && (
+                      <div className="rounded-md border border-green-200 bg-green-50 p-3">
+                        <p className="text-sm text-green-800">{success}</p>
+                      </div>
+                    )}
                     <Button type="submit" className="w-full">
                       Create account
                     </Button>
@@ -132,7 +203,7 @@ export default function Auth() {
             </Card>
           </div>
           <div className="order-1 flex flex-col justify-center lg:order-2">
-            <div className="mx-auto max-w-xl text-center lg:text-left">
+            <div className="mx-auto max-w-xl text-center lg:text-left" data-loc="client/pages/Auth.tsx:134:11">
               <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                 Modern • Clean • Educator-friendly
               </div>
@@ -153,12 +224,16 @@ export default function Auth() {
                 <Button
                   variant="secondary"
                   onClick={async () => {
+                    setError("");
+                    setSuccess("");
                     try {
                       await signInAnonymously();
                       toast.success("Signed in as guest");
                       window.location.href = "/dashboard";
                     } catch (e: any) {
-                      toast.error(e?.message || "Guest sign-in failed");
+                      const msg = e?.message || "Guest sign-in failed";
+                      setError(msg);
+                      toast.error(msg);
                     }
                   }}
                 >
