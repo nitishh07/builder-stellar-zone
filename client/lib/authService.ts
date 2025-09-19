@@ -20,7 +20,12 @@ export const authService = {
     if (error) throw error;
   },
   async signInWithGithub() {
-    const { data, error } = await getSupabase().auth.signInWithOAuth({ provider: "github" });
+    const { data, error } = await getSupabase().auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
     if (error) throw error;
     return data;
   },
