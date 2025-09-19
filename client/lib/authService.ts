@@ -1,8 +1,8 @@
-import { supabase } from "./supabaseClient";
+import { getSupabase } from "./supabaseClient";
 
 export const authService = {
   async signUp(email: string, password: string, userData: Record<string, any> = {}) {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getSupabase().auth.signUp({
       email,
       password,
       options: { data: userData },
@@ -11,40 +11,40 @@ export const authService = {
     return { user: data.user, session: data.session };
   },
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) throw error;
     return { user: data.user, session: data.session };
   },
   async signOut() {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await getSupabase().auth.signOut();
     if (error) throw error;
   },
   async signInWithGithub() {
-    const { data, error } = await supabase.auth.signInWithOAuth({ provider: "github" });
+    const { data, error } = await getSupabase().auth.signInWithOAuth({ provider: "github" });
     if (error) throw error;
     return data;
   },
   async resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
   },
   async updatePassword(newPassword: string) {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await getSupabase().auth.updateUser({ password: newPassword });
     if (error) throw error;
   },
   async getSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { session }, error } = await getSupabase().auth.getSession();
     if (error) throw error;
     return session;
   },
   async getUser() {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const { data: { user }, error } = await getSupabase().auth.getUser();
     if (error) throw error;
     return user;
   },
-  onAuthStateChange(callback: Parameters<typeof supabase.auth.onAuthStateChange>[0]) {
-    return supabase.auth.onAuthStateChange(callback);
+  onAuthStateChange(callback: Parameters<ReturnType<typeof getSupabase>["auth"]["onAuthStateChange"]>[0]) {
+    return getSupabase().auth.onAuthStateChange(callback);
   },
 };
