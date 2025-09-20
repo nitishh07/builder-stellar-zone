@@ -85,15 +85,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
-            <UploadAndReport onProcessed={setCsvRows} />
-          </div>
-          <div className="rounded-lg border bg-card p-4 shadow-sm">
-            <div className="mb-2 text-sm font-semibold">Or fetch predictions from backend</div>
+            <div className="mb-2 text-sm font-semibold">Generate report via your backend</div>
             <Separator className="my-3" />
-            {/* Backend uploader */}
-            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-            {/* @ts-ignore next-line - component lives in report folder */}
-            {/* Imported below */}
             <BackendPredict onProcessed={setCsvRows} />
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
