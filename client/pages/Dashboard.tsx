@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { StudentTable } from "@/components/dashboard/StudentTable";
 import { StudentDetailModal } from "@/components/dashboard/StudentDetailModal";
-import { UploadAndReport } from "@/components/report/UploadAndReport";
 import { BackendPredict } from "@/components/report/BackendPredict";
 import { students } from "@/data/students";
 import type { Student, FeeStatus } from "@/data/students";
