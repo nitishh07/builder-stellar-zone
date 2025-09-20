@@ -38,17 +38,37 @@ function normalizeRows(data: any[]): any[] {
   const out = rows.map((r: any) => {
     const total = parseNumber(r.total_fee ?? r.fee_total ?? r.total);
     const paid = parseNumber(r.fee_paid ?? r.paid ?? r.amount_paid);
-    const remainingRaw = r.fee_remaining ?? r.remaining ?? r.balance ?? (total || paid ? total - paid : 0);
+    const remainingRaw =
+      r.fee_remaining ??
+      r.remaining ??
+      r.balance ??
+      (total || paid ? total - paid : 0);
     const attendancePct = parseNumber(
-      r.attendance_percentage ?? r.Attendence_percentage ?? r.attendance ?? r.attendance_pct ?? r.att_pct,
+      r.attendance_percentage ??
+        r.Attendence_percentage ??
+        r.attendance ??
+        r.attendance_pct ??
+        r.att_pct,
     );
     const marksPct = parseNumber(
-      r.marks_percentage ?? r.average ?? r.avg ?? r.score_pct ?? r.marks ?? r.score,
+      r.marks_percentage ??
+        r.average ??
+        r.avg ??
+        r.score_pct ??
+        r.marks ??
+        r.score,
     );
 
     return {
       student_ID: String(
-        r.student_id ?? r.studentID ?? r.id ?? r.student ?? r.roll_no ?? r.roll ?? r.ID ?? "",
+        r.student_id ??
+          r.studentID ??
+          r.id ??
+          r.student ??
+          r.roll_no ??
+          r.roll ??
+          r.ID ??
+          "",
       ),
       name: String(r.name ?? r.student_name ?? r.full_name ?? "—"),
       class: String(r.class ?? r.section ?? r.grade ?? "—"),
@@ -73,7 +93,11 @@ function normalizeRows(data: any[]): any[] {
   return out;
 }
 
-export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) => void }) {
+export function BackendPredict({
+  onProcessed,
+}: {
+  onProcessed?: (rows: any[]) => void;
+}) {
   const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
   const [gradesFile, setGradesFile] = useState<File | null>(null);
   const [feesFile, setFeesFile] = useState<File | null>(null);
@@ -82,7 +106,9 @@ export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) =>
 
   async function sendToBackend() {
     if (!attendanceFile || !gradesFile || !feesFile) {
-      toast.error("Please choose all three CSV files: attendance, grades, and fees.");
+      toast.error(
+        "Please choose all three CSV files: attendance, grades, and fees.",
+      );
       return;
     }
     setLoading(true);
@@ -123,22 +149,40 @@ export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) =>
 
   return (
     <Card className="p-4 shadow-sm">
-      <div className="mb-2 text-sm font-semibold">Predict via Backend (Render)</div>
+      <div className="mb-2 text-sm font-semibold">
+        Predict via Backend (Render)
+      </div>
       <p className="mb-3 text-sm text-muted-foreground">
-        Upload the three CSVs (attendance, grades, fees) and send them to your Render backend /predict endpoint.
+        Upload the three CSVs (attendance, grades, fees) and send them to your
+        Render backend /predict endpoint.
       </p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="att-file">Attendance CSV</Label>
-          <Input id="att-file" type="file" accept=".csv,text/csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
+          <Input
+            id="att-file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="grades-file">Grades CSV</Label>
-          <Input id="grades-file" type="file" accept=".csv,text/csv" onChange={(e) => setGradesFile(e.target.files?.[0] || null)} />
+          <Input
+            id="grades-file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setGradesFile(e.target.files?.[0] || null)}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="fees-file">Fees CSV</Label>
-          <Input id="fees-file" type="file" accept=".csv,text/csv" onChange={(e) => setFeesFile(e.target.files?.[0] || null)} />
+          <Input
+            id="fees-file"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => setFeesFile(e.target.files?.[0] || null)}
+          />
         </div>
       </div>
       <div className="mt-3 flex justify-end">
@@ -148,7 +192,9 @@ export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) =>
       </div>
       <Separator className="my-4" />
       {preview ? (
-        <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(preview, null, 2)}</pre>
+        <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+          {JSON.stringify(preview, null, 2)}
+        </pre>
       ) : null}
     </Card>
   );
