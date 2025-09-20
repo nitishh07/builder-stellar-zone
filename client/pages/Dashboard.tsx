@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { StudentTable } from "@/components/dashboard/StudentTable";
 import { StudentDetailModal } from "@/components/dashboard/StudentDetailModal";
 import { UploadAndReport } from "@/components/report/UploadAndReport";
+import { BackendPredict } from "@/components/report/BackendPredict";
 import { students } from "@/data/students";
 import type { Student, FeeStatus } from "@/data/students";
 import { BellRing } from "lucide-react";
@@ -86,6 +87,15 @@ export default function Dashboard() {
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             <UploadAndReport onProcessed={setCsvRows} />
+          </div>
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <div className="mb-2 text-sm font-semibold">Or fetch predictions from backend</div>
+            <Separator className="my-3" />
+            {/* Backend uploader */}
+            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+            {/* @ts-ignore next-line - component lives in report folder */}
+            {/* Imported below */}
+            <BackendPredict onProcessed={setCsvRows} />
           </div>
           <div className="rounded-lg border bg-card p-4 shadow-sm">
             {csvRows?.length ? (
