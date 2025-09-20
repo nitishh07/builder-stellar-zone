@@ -74,13 +74,15 @@ function normalizeRows(data: any[]): any[] {
 }
 
 export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) => void }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
+  const [gradesFile, setGradesFile] = useState<File | null>(null);
+  const [feesFile, setFeesFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any | null>(null);
 
   async function sendToBackend() {
-    if (!file) {
-      toast.error("Please choose a CSV file to upload.");
+    if (!attendanceFile || !gradesFile || !feesFile) {
+      toast.error("Please choose all three CSV files: attendance, grades, and fees.");
       return;
     }
     setLoading(true);
@@ -88,7 +90,16 @@ export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) =>
     try {
       const url = `${getBackendUrl()}/predict`;
       const fd = new FormData();
-      fd.append("file", file);
+      // Append using several common field names for compatibility
+      fd.append("attendance", attendanceFile);
+      fd.append("grades", gradesFile);
+      fd.append("fees", feesFile);
+      fd.append("attendance_file", attendanceFile);
+      fd.append("grades_file", gradesFile);
+      fd.append("fees_file", feesFile);
+      fd.append("attendanceFile", attendanceFile);
+      fd.append("gradesFile", gradesFile);
+      fd.append("feesFile", feesFile);
       const res = await fetch(url, { method: "POST", body: fd });
       if (!res.ok) {
         const text = await res.text();
@@ -114,18 +125,26 @@ export function BackendPredict({ onProcessed }: { onProcessed?: (rows: any[]) =>
     <Card className="p-4 shadow-sm">
       <div className="mb-2 text-sm font-semibold">Predict via Backend (Render)</div>
       <p className="mb-3 text-sm text-muted-foreground">
-        Upload a consolidated CSV and send it to your Render backend /predict endpoint.
+        Upload the three CSVs (attendance, grades, fees) and send them to your Render backend /predict endpoint.
       </p>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="backend-file">CSV file</Label>
-          <Input id="backend-file" type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <Label htmlFor="att-file">Attendance CSV</Label>
+          <Input id="att-file" type="file" accept=".csv,text/csv" onChange={(e) => setAttendanceFile(e.target.files?.[0] || null)} />
         </div>
-        <div className="flex items-end">
-          <Button onClick={sendToBackend} disabled={loading}>
-            {loading ? "Sending..." : "Send to /predict"}
-          </Button>
+        <div className="space-y-2">
+          <Label htmlFor="grades-file">Grades CSV</Label>
+          <Input id="grades-file" type="file" accept=".csv,text/csv" onChange={(e) => setGradesFile(e.target.files?.[0] || null)} />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="fees-file">Fees CSV</Label>
+          <Input id="fees-file" type="file" accept=".csv,text/csv" onChange={(e) => setFeesFile(e.target.files?.[0] || null)} />
+        </div>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Button onClick={sendToBackend} disabled={loading}>
+          {loading ? "Sending..." : "Send to /predict"}
+        </Button>
       </div>
       <Separator className="my-4" />
       {preview ? (
